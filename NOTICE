@@ -1,0 +1,10 @@
+guardrail-chatbot-jev
+
+Third-party references
+----------------------
+
+The hazard taxonomy in policies/ cites the MLCommons AILuminate benchmark, Meta
+Llama Guard and the OWASP Top 10 for LLM Applications. Those are cited as
+sources; their own terms apply to their own material.
+
+This notice is informational. The licence for this software is MIT; see LICENSE.

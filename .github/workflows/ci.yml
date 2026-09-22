@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        run: pip install -e './python[dev]'
+      - name: Test
+        # No API key and no network: the suite decides against recorded answers.
+        run: cd python && python -m pytest -q
+
+  typescript:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["20", "22"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - run: cd ts && npm ci
+      - run: cd ts && npm run typecheck
+      - run: cd ts && npm test
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: The wheel must build and carry the policy pack
+        # `pip install -e` never exercises the wheel builder, so a packaging fault is invisible to
+        # the test jobs. Build it, install it somewhere clean, and use it.
+        run: |
+          pip install build
+          cd python && python -m build --wheel --outdir dist
+          python -m venv /tmp/v
+          /tmp/v/bin/pip install dist/*.whl
+          /tmp/v/bin/python -c "
+          from guardrail_chatbot_jev import Policy
+          assert len(Policy.bundled().categories) == 18
+          print('wheel ships a usable policy pack')
+          "
+          /tmp/v/bin/guardrail-chatbot-jev --surface input --text test --dry-run > /dev/null
+
+  typescript-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - run: cd ts && npm ci
+      # `npm test` compiles a different tsconfig, so the published build stays untested otherwise.
+      - name: The published build must compile and carry the policy pack
+        run: |
+          cd ts && npm run build
+          test -f dist/index.js
+          test -f dist/policies/standard-v1.json
+          node -e "import('./dist/index.js').then(m => {
+            const p = m.Policy.bundled();
+            if (p.categories.size !== 18) throw new Error('pack missing from build');
+            console.log('build ships a usable policy pack');
+          })"
+
+  policy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: The shipped packs must match the canonical one
+        # Both packages ship a copy of policies/. A change that forgets to sync them would
+        # otherwise leave the two languages enforcing different policies.
+        run: |
+          ./scripts/sync-policies.sh
+          git diff --exit-code -- python/src/guardrail_chatbot_jev/policies ts/src/policies

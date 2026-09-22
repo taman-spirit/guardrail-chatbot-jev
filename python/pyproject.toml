@@ -1,0 +1,30 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "guardrail-chatbot-jev"
+version = "1.0.0"
+description = "Content guardrails for AI chatbots, decided by the Jev decision model"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = []
+
+[project.optional-dependencies]
+yaml = ["pyyaml>=6"]
+dev = ["pytest>=8"]
+# Only examples/chatbot_server.py needs these; the library itself has no dependencies.
+server = ["fastapi[standard]>=0.115", "anthropic>=1.0"]
+
+[project.scripts]
+guardrail-chatbot-jev = "guardrail_chatbot_jev.cli:main"
+
+[tool.hatch.build.targets.wheel]
+# policies/ lives inside the package, so the package listing already carries it. A force-include
+# on top of that adds the same file twice and the wheel build fails outright.
+packages = ["src/guardrail_chatbot_jev"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

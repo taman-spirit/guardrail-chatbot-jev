@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+.venv/
+
+# TypeScript
+node_modules/
+ts/dist/
+ts/dist-test/
+*.tsbuildinfo
+
+# Local
+calibration/
+.env
+results.jsonl
