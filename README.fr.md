@@ -221,6 +221,66 @@ ce qui est demandé au modèle, sans toucher au code.
 
 ---
 
+## Conversations multi-tours
+
+Une attaque multi-tours est faite de tours défendables un par un. C'est le fait de juger chaque tour
+depuis zéro qui la rend possible, alors le garde-fou fait deux choses que les contrôles d'un seul
+message ne peuvent pas faire.
+
+**`check_conversation` lit toute la transcription.** C'est la troisième surface, et elle cherche ce
+que seule la forme d'une conversation révèle : un crescendo qui s'ouvre de façon anodine puis
+s'appuie sur les réponses précédentes de l'assistant, une escalade au fil des tours, un personnage
+que l'on a peu à peu détourné de ses propres règles.
+
+**Une `Session` reporte ce qui s'est passé.** Elle conserve la transcription, un score de risque qui
+décroît, et un plancher sous les tours suivants :
+
+```python
+from guardrail_chatbot_jev import Guard, Session
+
+guard = Guard()
+session = Session(id=conversation_id)     # une par conversation, conservée entre les tours
+
+verdict = guard.check_input(user_message, session=session)
+...
+session.add_turn("user", user_message)
+session.add_turn("assistant", reply)
+session.advance()                          # laisse expirer un plancher levé
+
+guard.check_conversation(session.history, session=session)
+```
+
+Le plancher est ce qui change réellement les décisions :
+
+| Ce qui s'est déclenché | Plancher posé | Durée |
+| --- | --- | --- |
+| Un verdict de **conversation** à `review` ou pire | `review` | 2 tours (`carry_turns`) |
+| Tout message isolé qui aboutit à `block` | `flag` | 2 tours |
+
+Tant qu'un plancher tient, un verdict ultérieur ne peut pas descendre en dessous, et la route est
+recalculée en conséquence : un verdict relevé ne finit donc pas par dire `deliver`. En parallèle,
+`risk` est divisé par deux à chaque tour (`allow` 0, `flag` 0,25, `review` 0,6, `block` 1,0), si
+bien qu'un tour signalé cesse de compter après trois ou quatre tours propres. `session.metadata()`
+place l'identifiant de conversation, le numéro de tour et le risque courant devant Jev aux tours
+suivants.
+
+Trois détails à connaître :
+
+- **Un verdict dégradé ne fait jamais bouger la session.** Un Jev injoignable est une panne, pas une
+  information sur la conversation, et la compter transformerait une brève interruption en suspicion
+  durable envers un utilisateur innocent.
+- **Le plancher du contrôle de conversation s'applique au tour suivant, pas à celui qui l'a
+  déclenché.** C'est inhérent et non un raccourci : le motif n'est visible qu'une fois le tour qui
+  le complète existant. Exécutez-le hors du chemin critique et il ne coûte rien à l'utilisateur.
+- **La fenêtre de transcription est de dix tours** (`max_turns`), car l'escalade se joue dans les
+  tours récents et une fenêtre courte coûte une fraction des tokens d'entrée. Augmentez-la si vos
+  conversations se construisent réellement sur davantage.
+
+Les sessions ne servent que si elles survivent à la requête, ce qui relève du déploiement et non du
+garde-fou ; voir [Passer en production](#passer-en-production) pour les persister entre workers.
+
+---
+
 ## Ajouter votre propre domaine de conformité
 
 La taxonomie livrée est ce que tout déploiement partage. Ce qu'un produit régulé exige en plus lui

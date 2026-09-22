@@ -216,6 +216,65 @@ model, không cần đụng tới code.
 
 ---
 
+## Nhiều lượt (multi-turn)
+
+Một đòn tấn công rải qua nhiều lượt được ghép từ những lượt mà xét riêng lượt nào cũng bào chữa
+được. Chính việc xét mỗi lượt từ con số không là thứ khiến nó thành công, nên hàng rào làm thêm hai
+việc mà hai lần kiểm đơn lẻ không làm được.
+
+**`check_conversation` đọc toàn bộ transcript.** Đây là bề mặt thứ ba, và nó tìm thứ chỉ lộ ra qua
+hình dạng của cả cuộc hội thoại: một đòn crescendo mở đầu vô hại rồi dựa vào chính các câu trả lời
+trước của trợ lý, một chuỗi leo thang qua nhiều lượt, một persona đã bị nói cho rời khỏi quy tắc của
+chính nó.
+
+**`Session` mang những gì đã xảy ra đi tiếp.** Nó giữ transcript, một điểm rủi ro suy giảm dần, và
+một cái sàn đặt dưới vài lượt kế tiếp:
+
+```python
+from guardrail_chatbot_jev import Guard, Session
+
+guard = Guard()
+session = Session(id=conversation_id)     # mỗi hội thoại một cái, giữ lại giữa các lượt
+
+verdict = guard.check_input(user_message, session=session)
+...
+session.add_turn("user", user_message)
+session.add_turn("assistant", reply)
+session.advance()                          # để một cái sàn đã dựng lên được hết hạn
+
+guard.check_conversation(session.history, session=session)
+```
+
+Cái sàn mới là phần thực sự đổi phán quyết:
+
+| Cái gì kích hoạt | Sàn nó đặt ra | Kéo dài |
+| --- | --- | --- |
+| Một verdict **conversation** từ `review` trở lên | `review` | 2 lượt (`carry_turns`) |
+| Bất kỳ tin nhắn đơn lẻ nào ra `block` | `flag` | 2 lượt |
+
+Khi sàn còn hiệu lực, một verdict sau đó không thể rơi xuống dưới nó, và route được tính lại cho
+khớp, nên một verdict bị nâng sàn không kết thúc bằng `deliver`. Song song, `risk` giảm một nửa mỗi
+lượt (`allow` 0, `flag` 0.25, `review` 0.6, `block` 1.0), nên một lượt bị flag sẽ hết ảnh hưởng sau
+ba bốn lượt sạch. `session.metadata()` đưa conversation id, số thứ tự lượt và mức rủi ro hiện tại ra
+trước mặt Jev ở các lượt sau.
+
+Ba chi tiết đáng biết:
+
+- **Verdict `degraded` không bao giờ làm session dịch chuyển.** Jev không gọi được là sự cố hạ tầng,
+  không phải bằng chứng về cuộc hội thoại; tính nó vào sẽ biến một lần outage ngắn thành sự nghi ngờ
+  kéo dài với một người dùng vô tội.
+- **Sàn do conversation check dựng lên rơi vào lượt kế tiếp, không phải lượt vừa kích hoạt nó.** Đây
+  là bản chất chứ không phải đi tắt: cái pattern chỉ nhìn thấy được khi lượt hoàn tất nó đã tồn tại.
+  Cho nó chạy ngoài critical path thì người dùng không phải trả thêm gì.
+- **Cửa sổ transcript là 10 lượt** (`max_turns`), vì phần leo thang nằm ở các lượt gần nhất và cửa
+  sổ ngắn chỉ tốn một phần nhỏ input token. Nâng lên nếu hội thoại của bạn thật sự xây dựng qua
+  nhiều lượt hơn.
+
+Session chỉ có tác dụng nếu nó sống lâu hơn request, và đó là bài toán của deployment chứ không phải
+của hàng rào; xem [Đưa lên production](#đưa-lên-production) để biết cách lưu nó qua nhiều worker.
+
+---
+
 ## Thêm một mảng tuân thủ của riêng bạn
 
 Bộ phân loại đi kèm là phần mọi deployment đều dùng chung. Thứ mà một sản phẩm có quy định riêng

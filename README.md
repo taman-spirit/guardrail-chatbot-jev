@@ -211,6 +211,65 @@ is asked, without touching code.
 
 ---
 
+## Multi-turn
+
+A multi-turn attack is built out of turns that are each defensible on their own. Judging every turn
+from a standing start is what makes that work, so the guardrail does two things that the
+single-message checks cannot.
+
+**`check_conversation` reads the whole transcript.** It is the third surface, and it looks for what
+only the shape of a conversation shows: a crescendo that opens benignly and leans on the
+assistant's own earlier answers, an escalation across turns, a persona that has been talked out of
+its own rules.
+
+**A `Session` carries what happened forward.** It holds the transcript, a decaying risk score, and
+a floor under the next few turns:
+
+```python
+from guardrail_chatbot_jev import Guard, Session
+
+guard = Guard()
+session = Session(id=conversation_id)     # one per conversation, kept between turns
+
+verdict = guard.check_input(user_message, session=session)
+...
+session.add_turn("user", user_message)
+session.add_turn("assistant", reply)
+session.advance()                          # lets a raised floor expire
+
+guard.check_conversation(session.history, session=session)
+```
+
+The floor is the part that changes decisions:
+
+| What fired | Floor it sets | Lasts |
+| --- | --- | --- |
+| A **conversation** verdict of `review` or worse | `review` | 2 turns (`carry_turns`) |
+| Any single message resolving to `block` | `flag` | 2 turns |
+
+While a floor is up, a later verdict cannot resolve below it, and the route is recomputed to match,
+so a floored verdict does not end up saying `deliver`. Alongside it, `risk` decays by half each
+turn (`allow` 0, `flag` 0.25, `review` 0.6, `block` 1.0), so one flagged turn stops mattering after
+three or four clean ones. `session.metadata()` puts the conversation id, the turn number and the
+current risk in front of Jev on later turns.
+
+Three details worth knowing:
+
+- **A degraded verdict never moves the session.** An unreachable Jev is an outage, not evidence
+  about the conversation, and counting it would turn a brief one into lasting suspicion of an
+  innocent user.
+- **The conversation check's floor lands on the next turn, not the one that triggered it.** That is
+  inherent rather than a shortcut: the pattern is not visible until the turn completing it exists.
+  Run it off the critical path and it costs the user nothing.
+- **The transcript window is ten turns** (`max_turns`), because the escalation lives in the recent
+  ones and a short window costs a fraction of the input tokens. Raise it if your conversations
+  genuinely build over more.
+
+Sessions only work if they outlive the request, which is a deployment problem rather than a
+guardrail one; see [Going to production](#going-to-production) for persisting them across workers.
+
+---
+
 ## Adding a compliance domain of your own
 
 The shipped taxonomy is what every deployment shares. What a regulated product needs on top of it
