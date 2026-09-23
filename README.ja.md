@@ -34,6 +34,39 @@
 **Python と TypeScript** の両方で動き、どちらも同じポリシーファイルを読むので、スタックの両側が
 食い違うことはありません。どちらのパッケージにもサードパーティ依存はありません。
 
+## リリース
+
+| リリース | タグ | 内容 |
+| --- | --- | --- |
+| [Python SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.0) | `python/v1.0.0` | Python パッケージ：3 つのチェック、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI |
+| [Go SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.0.0) | `go/v1.0.0` | Python パッケージの Go 移植版。同じポリシーを読み、同じ判定を返す |
+| [Python：ベトナム準拠ポリシー v1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1) | `python-vietnam-compliance-v1` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 |
+| [Go：ベトナム準拠ポリシー v1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1) | `go-vietnam-compliance-v1` | 同じポリシーと定型応答の Go 版（モジュールバージョン `v1.1.0`） |
+
+各リリースノートに内容とインストール方法を記載しています。上の表と同じ順に：
+
+```bash
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.0.0#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.0.0
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.0
+```
+
+Go 版とベトナム版はそれぞれ専用ブランチ（`go-sdk`、`guardrail-vietnam-compliance`、
+`go-vietnam-compliance`）からビルドされており、まだ `main` にはマージされていません。
+[すべてのリリース](https://github.com/taman-spirit/guardrail-chatbot-jev/releases)。
+
+## ベトナムにおける AI 規制への準拠
+
+ベトナムで提供する AI サービス向けに、`vietnam-compliance-v1` ポリシーは次の 2 つの法律が求めるコンテンツ要件に対応します。
+
+- **人工知能法**（Luật Trí tuệ nhân tạo）
+- **サイバーセキュリティ法**（Luật An ninh mạng）
+
+共通の分類に独自のルールを重ね、違反グループごとにベトナム語・英語・中国語の定型応答を返します（モデルには書かせません）。通常の質問を誤ってブロックしないよう設計されています。本番投入前に、自社のトラフィックで調整してください。
+
+段階的な準拠ガイドでは、適用範囲、透明性、禁止コンテンツ、Python と Go での組み込み、調整、人による監督、記録の保持を扱います：**[Tiếng Việt](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.vi.md) · [English](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.md) · [中文](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.zh.md)**。
+
 ## 仕組みを図で
 
 ```
