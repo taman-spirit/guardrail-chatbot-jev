@@ -38,7 +38,7 @@
 
 | リリース | タグ | 内容 | ライセンス |
 | --- | --- | --- | --- |
-| [Python SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.0) | `python/v1.0.0` | Python パッケージ：3 つのチェック、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | MIT |
+| [Python SDK 1.0.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.1) | `python/v1.0.1` | Python パッケージ：3 つのチェック、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
 | [Go SDK 1.0.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.0.1) | `go/v1.0.1` | Python パッケージの Go 移植版。同じポリシーを読み、同じ判定を返す | CC BY-NC 4.0 |
 | [Python：ベトナム準拠ポリシー v1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.1) | `python-vietnam-compliance-v1.1` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
 | [Go：ベトナム準拠ポリシー v1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.1) | `go-vietnam-compliance-v1.1` | 同じポリシーと定型応答の Go 版（モジュールバージョン `v1.1.1`） | CC BY-NC 4.0 |
@@ -46,7 +46,7 @@
 各リリースノートに内容とインストール方法を記載しています。上の表と同じ順に：
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.0.0#subdirectory=python"
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.0.1#subdirectory=python"
 go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.0.1
 pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.1#subdirectory=python"
 go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.1
@@ -54,7 +54,7 @@ go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.1
 
 Go 版とベトナム版はそれぞれ専用ブランチ（`go-sdk`、`guardrail-vietnam-compliance`、
 `go-vietnam-compliance`）からビルドされており、まだ `main` にはマージされていません。以前のリリース
-`go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` はこれらに置き換えられ、引き続き MIT ライセンスです。[すべてのリリース](https://github.com/taman-spirit/guardrail-chatbot-jev/releases)。
+`python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` はこれらに置き換えられ、引き続き MIT ライセンスです。[すべてのリリース](https://github.com/taman-spirit/guardrail-chatbot-jev/releases)。
 
 ## ベトナムにおける AI 規制への準拠
 
