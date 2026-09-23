@@ -16,6 +16,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - A step-by-step compliance guide for AI services in Viet Nam, in Vietnamese, English and Chinese:
   `docs/vietnam-compliance*.md`.
 
+### Changed
+
+- A rule can set `skip_confidence_gate`, so that low confidence alone does not hold content the
+  rule vouches for. A finding a rule capped to `allow` no longer sets the route.
+
 ## [1.0.0]
 
 First public release.
