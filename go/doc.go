@@ -17,4 +17,4 @@ package guardrail
 
 // Version is the Go module version. It moves ahead of the Python and TypeScript packages when the
 // Go module ships something they have not released yet.
-const Version = "1.1.0"
+const Version = "1.1.1"
