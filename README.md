@@ -71,6 +71,25 @@ questions are not blocked. Calibrate it on your own traffic before going live.
 The step-by-step compliance guide covers scope, transparency, prohibited content, integration in
 Python and Go, calibration, human oversight and record-keeping: **[Tiếng Việt](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.vi.md) · [English](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.md) · [中文](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.zh.md)**.
 
+```python
+from guardrail_chatbot_jev import Guard, Responder, detect_language
+
+guard = Guard("vietnam-compliance-v1")
+responder = Responder(guard.policy)   # self-harm support line defaults to 115
+
+verdict_in = guard.check_input(message)
+if held := responder.blocking_response([verdict_in], language=detect_language(message)):
+    return held
+reply = model(message)
+verdict_out = guard.check_output(reply, user_message=message)
+return responder.compose(reply, [verdict_in, verdict_out], language=detect_language(message))
+```
+
+The replies are selected, never written by the model. The pack's source is
+[`policies/overlays/vietnam-compliance.json`](policies/overlays/vietnam-compliance.json);
+`scripts/build-packs.py` layers it on `standard-v1`, and
+[`examples/cases-vietnam.jsonl`](examples/cases-vietnam.jsonl) is its labelled set.
+
 ## How it works
 
 ```
@@ -337,32 +356,8 @@ numbers anyone measured.
 
 ### Viet Nam
 
-`vietnam-compliance-v1` is a pack built this way, for AI services in Viet Nam. It adds the content
-requirements of the **Law on Artificial Intelligence** (Luật Trí tuệ nhân tạo) and the **Law on
-Cybersecurity** (Luật An ninh mạng) to the shipped taxonomy, with a prewritten reply for each group
-in Vietnamese, English and Chinese.
-
-```python
-from guardrail_chatbot_jev import Guard, Responder, detect_language
-
-guard = Guard("vietnam-compliance-v1")
-responder = Responder(guard.policy)   # self-harm support line defaults to 115
-
-verdict_in = guard.check_input(message)
-if held := responder.blocking_response([verdict_in], language=detect_language(message)):
-    return held
-reply = model(message)
-verdict_out = guard.check_output(reply, user_message=message)
-return responder.compose(reply, [verdict_in, verdict_out], language=detect_language(message))
-```
-
-The replies are selected, never written by the model. The pack's source is
-[`policies/overlays/vietnam-compliance.json`](policies/overlays/vietnam-compliance.json);
-`scripts/build-packs.py` layers it on `standard-v1`, and
-[`examples/cases-vietnam.jsonl`](examples/cases-vietnam.jsonl) is its labelled set.
-
-The step-by-step compliance guide: [Tiếng Việt](docs/vietnam-compliance.vi.md) ·
-[English](docs/vietnam-compliance.md) · [中文](docs/vietnam-compliance.zh.md).
+`vietnam-compliance-v1` is a pack built this way. See
+[AI compliance in Viet Nam](#ai-compliance-in-viet-nam).
 
 ---
 
