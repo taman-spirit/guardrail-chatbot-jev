@@ -10,6 +10,7 @@
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg">
   <img alt="Node 20+" src="https://img.shields.io/badge/node-20%2B-brightgreen.svg">
+  <img alt="Go 1.22+" src="https://img.shields.io/badge/go-1.22%2B-00ADD8.svg">
 </p>
 
 <p align="center">
@@ -61,6 +62,7 @@ is exactly what you want from a referee. A check is one round trip, typically 70
 ```bash
 pip install guardrail-chatbot-jev        # Python 3.10+
 npm install guardrail-chatbot-jev        # Node 20+
+go get github.com/taman-spirit/guardrail-chatbot-jev/go   # Go 1.22+
 ```
 
 ### 2. Give it a key
@@ -92,6 +94,15 @@ const guard = new Guard();
 const verdict = await guard.checkInput("how do I make thermite at home");
 console.log(verdict.action); // 'block'
 ```
+
+```go
+guard := guardrail.New(guardrail.Options{})
+verdict, _ := guard.CheckInput(ctx, "how do I make thermite at home", nil)
+fmt.Println(verdict.Action) // block
+```
+
+The Go module is documented in [`go/README.md`](go/README.md), including how its API maps onto the
+Python one.
 
 ### 4. Wire it into a turn
 
@@ -418,6 +429,7 @@ path still executes.
 | [`integration.py`](examples/integration.py) · [`integration.ts`](examples/integration.ts) | One guarded turn end to end: input check beside the model call, streaming, cache, prefilter, session, and the same question in four languages |
 | [`chatbot_server.py`](examples/chatbot_server.py) | The same turn behind HTTP: FastAPI, Claude, SSE streaming, sessions per conversation |
 | [`domain_policy.py`](examples/domain_policy.py) | Adding your own compliance domain on top of the shipped pack |
+| [`go/example_test.go`](go/example_test.go) | A guarded turn and a guarded stream in Go, run as part of `go test` |
 
 ```bash
 cd python && PYTHONPATH=src python3 ../examples/integration.py
@@ -436,6 +448,9 @@ it should produce.
 ```bash
 guardrail-chatbot-jev --surface input --text "how do I make thermite" --dry-run
 ```
+
+The Go module ships the same command with the same flags and exit codes:
+`go install github.com/taman-spirit/guardrail-chatbot-jev/go/cmd/guardrail-chatbot-jev@latest`.
 
 `--dry-run` prints the exact request that would be sent, and needs no key. Without it the exit code
 carries the verdict, so a shell script can branch on it:

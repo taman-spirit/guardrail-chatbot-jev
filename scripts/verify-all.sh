@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Everything, in one run: both test suites, the policy pack, the CLI, every example, the offline
+# Everything, in one run: every test suite, the policy pack, the CLI, every example, the offline
 # tuning tool, and the packaging.
 #
 #   scripts/verify-all.sh
@@ -35,8 +35,18 @@ run "the build loads and carries the pack" "cd ts && node -e \"
     if (m.Policy.bundled().categories.size !== 18) throw new Error('pack missing from build');
   })\""
 
+section "go: vet, tests, cli"
+if command -v go >/dev/null 2>&1; then
+  run "gofmt" "cd go && test -z \"\$(gofmt -l .)\""
+  run "vet" "cd go && go vet ./..."
+  run "tests" "cd go && go test -race ./..."
+  run "dry run needs no key" "cd go && go run ./cmd/guardrail-chatbot-jev --surface input --text x --dry-run"
+else
+  skip "go" "install Go 1.22+"
+fi
+
 section "policy pack"
-run "the three shipped copies are identical" "./scripts/sync-policies.sh >/dev/null && git diff --quiet -- python/src/guardrail_chatbot_jev/policies ts/src/policies"
+run "the shipped copies are identical" "./scripts/sync-policies.sh >/dev/null && git diff --quiet -- python/src/guardrail_chatbot_jev/policies ts/src/policies go/policies"
 run "thresholds ordered, rules resolve" "python3 -c \"
 import sys; sys.path.insert(0, 'python/src')
 from guardrail_chatbot_jev import Policy

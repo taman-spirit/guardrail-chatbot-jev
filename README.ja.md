@@ -60,6 +60,7 @@
 ```bash
 pip install guardrail-chatbot-jev        # Python 3.10+
 npm install guardrail-chatbot-jev        # Node 20+
+go get github.com/taman-spirit/guardrail-chatbot-jev/go   # Go 1.22+
 ```
 
 どちらのパッケージにもサードパーティ依存はありません。

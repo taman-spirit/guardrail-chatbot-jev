@@ -65,6 +65,7 @@ contrôle tient en un aller-retour, généralement 70-500 ms.
 ```bash
 pip install guardrail-chatbot-jev        # Python 3.10+
 npm install guardrail-chatbot-jev        # Node 20+
+go get github.com/taman-spirit/guardrail-chatbot-jev/go   # Go 1.22+
 ```
 
 Aucune dépendance tierce dans l'un ou l'autre paquet.

@@ -50,6 +50,7 @@ def test_policy_copies_stay_in_sync() -> None:
     for copy in (
         ROOT / "python" / "src" / "guardrail_chatbot_jev" / "policies" / "standard-v1.json",
         ROOT / "ts" / "src" / "policies" / "standard-v1.json",
+        ROOT / "go" / "policies" / "standard-v1.json",
     ):
         assert json.loads(copy.read_text("utf-8")) == canonical, f"{copy} drifted; run scripts/sync-policies.sh"
 

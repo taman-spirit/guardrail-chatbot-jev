@@ -43,6 +43,27 @@ jobs:
       - run: cd ts && npm run typecheck
       - run: cd ts && npm test
 
+  go:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ["1.22", "stable"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache-dependency-path: go/go.mod
+      - run: cd go && test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - run: cd go && go vet ./...
+      # No API key and no network: the suite decides against recorded answers.
+      - run: cd go && go test -race ./...
+      - name: The CLI builds and runs without a key
+        run: |
+          cd go && go build -o /tmp/gj ./cmd/guardrail-chatbot-jev
+          /tmp/gj --surface input --text test --dry-run > /dev/null
+
   package:
     runs-on: ubuntu-latest
     steps:
@@ -95,8 +116,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: The shipped packs must match the canonical one
-        # Both packages ship a copy of policies/. A change that forgets to sync them would
-        # otherwise leave the two languages enforcing different policies.
+        # Every package ships a copy of policies/. A change that forgets to sync them would
+        # otherwise leave the languages enforcing different policies.
         run: |
           ./scripts/sync-policies.sh
-          git diff --exit-code -- python/src/guardrail_chatbot_jev/policies ts/src/policies
+          git diff --exit-code -- python/src/guardrail_chatbot_jev/policies ts/src/policies go/policies

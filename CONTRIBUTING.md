@@ -4,26 +4,28 @@ Thanks for looking. Issues and pull requests are both welcome.
 
 ## Running the tests
 
-Neither suite needs an API key or a network. Both run the decision engine against recorded
-answers, which is also how you should test your own changes.
+No suite needs an API key or a network. Each runs the decision engine against recorded answers,
+which is also how you should test your own changes.
 
 ```bash
 pip install -e './python[dev]'
 cd python && python3 -m pytest -q
 
 cd ts && npm install && npm test
+
+cd go && go test -race ./...
 ```
 
 ## Changing the policy
 
-`policies/standard-v1.json` is the source of truth, and both packages ship a copy of it. After any
+`policies/standard-v1.json` is the source of truth, and every package ships a copy of it. After any
 edit:
 
 ```bash
 ./scripts/sync-policies.sh
 ```
 
-CI fails if you forget, because two languages enforcing different policies is the worst kind of
+CI fails if you forget, because languages enforcing different policies is the worst kind of
 bug here: it only shows up in production, on one side.
 
 Remember that the descriptions in the pack are not documentation. They are the text sent to Jev as
@@ -44,9 +46,9 @@ auditor recognises. A category with no `refs` needs a reason.
 feel right. `scripts/sweep.py` replays a recorded calibration offline; include the before and
 after.
 
-**Both languages stay in step.** The Python and TypeScript engines are ports of each other. A
-change to `decide` in one needs the same change and the same test in the other. `tuning.py` is the
-exception: it is offline analysis tooling and lives in Python only.
+**The languages stay in step.** The Python, TypeScript and Go engines are ports of each other. A
+change to `decide` in one needs the same change and the same test in the others. Offline tuning is
+the exception: it lives in Python and Go, not TypeScript.
 
 ## Adding labelled cases
 

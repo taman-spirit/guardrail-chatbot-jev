@@ -3,6 +3,16 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- A Go module in `go/`, a port of the Python package: the three checks, `CheckTurn`, the cache,
+  prefilter, session, streaming over channels, the recording transports, offline tuning and the
+  command line. It embeds the same policy pack, sends the same request and reaches the same
+  verdict for the same answers; sessions saved by one language restore in the other. No
+  third-party dependencies.
+
 ## [1.0.0]
 
 First public release.
