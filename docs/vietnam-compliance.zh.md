@@ -40,7 +40,7 @@
 
 ## 第四步：接入应用
 
-Python：
+Python（`Responder` 包含在发布版本 `python-vietnam-compliance-v1` 中，位于分支 `guardrail-vietnam-compliance`）：
 
 ```python
 from guardrail_chatbot_jev import Guard, Responder, detect_language

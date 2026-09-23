@@ -3,6 +3,8 @@ package guardrail
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
+	"sort"
 	"strings"
 	"unicode"
 )
@@ -73,9 +75,10 @@ type responsesSpec struct {
 
 // Responder selects the prewritten reply for a set of verdicts. It is safe for concurrent use.
 type Responder struct {
-	spec       responsesSpec
-	crisisLine string
-	byCategory map[string]string
+	spec           responsesSpec
+	hasAffirmation bool
+	crisisLine     string
+	byCategory     map[string]string
 }
 
 var affirmGroups = map[string]bool{"sovereignty": true}
@@ -94,11 +97,21 @@ func NewResponder(p *Policy, crisisLine string) (*Responder, error) {
 	if err := json.Unmarshal(raw, &r.spec); err != nil {
 		return nil, fmt.Errorf("policy %q responses: %w", p.ID, err)
 	}
+	var probe map[string]json.RawMessage
+	_ = json.Unmarshal(raw, &probe)
+	_, r.hasAffirmation = probe["sovereignty_affirmation"]
 	if len(r.spec.Languages) == 0 {
 		r.spec.Languages = []string{LangVietnamese}
 	}
 	if r.spec.DefaultLanguage == "" {
 		r.spec.DefaultLanguage = r.spec.Languages[0]
+	}
+	if len(r.spec.Order) == 0 {
+		// As in Python, no explicit order means every group, here sorted so the choice is stable.
+		for name := range r.spec.Groups {
+			r.spec.Order = append(r.spec.Order, name)
+		}
+		sort.Strings(r.spec.Order)
 	}
 	r.crisisLine = firstNonEmpty(crisisLine, r.spec.CrisisLineDefault)
 	for _, name := range r.spec.Order {
@@ -108,7 +121,10 @@ func NewResponder(p *Policy, crisisLine string) (*Responder, error) {
 			}
 		}
 	}
-	return r, r.check()
+	if err := r.check(); err != nil {
+		return nil, err
+	}
+	return r, nil
 }
 
 // Affirmation is the fixed sovereignty statement, exactly as written in the pack.
@@ -134,7 +150,7 @@ func (r *Responder) Compose(reply string, verdicts []Verdict, lang string) strin
 		return reply
 	}
 	if c.Group == "affirmation" {
-		return strings.TrimRight(reply, " \t\r\n") + "\n\n" + c.Text
+		return strings.TrimRightFunc(reply, unicode.IsSpace) + "\n\n" + c.Text
 	}
 	return c.Text
 }
@@ -226,8 +242,11 @@ func (r *Responder) touchesSovereignty(v Verdict) bool {
 	if r.spec.Affirmation.TriggerValue != nil {
 		threshold = *r.spec.Affirmation.TriggerValue
 	}
-	value, ok := v.Signals[signal].(float64)
-	return ok && value >= threshold
+	value, ok := toFloat(v.Signals[signal])
+	if _, isBool := v.Signals[signal].(bool); isBool || !ok {
+		return false
+	}
+	return value >= threshold
 }
 
 func (r *Responder) groupText(group, lang string) string {
@@ -238,11 +257,13 @@ func (r *Responder) text(t texts, lang string) string {
 	if s, ok := t[lang]; ok && s != "" {
 		return s
 	}
-	if s, ok := t[r.spec.DefaultLanguage]; ok {
+	if s, ok := t[r.spec.DefaultLanguage]; ok && s != "" {
 		return s
 	}
-	for _, s := range t {
-		return s
+	for _, l := range r.spec.Languages {
+		if s := t[l]; s != "" {
+			return s
+		}
 	}
 	return ""
 }
@@ -251,7 +272,10 @@ func (r *Responder) text(t texts, lang string) string {
 func (r *Responder) check() error {
 	var missing []string
 	if len(r.spec.Order) == 0 {
-		missing = append(missing, "order is empty")
+		missing = append(missing, "no groups")
+	}
+	if !slices.Contains(r.spec.Languages, r.spec.DefaultLanguage) {
+		missing = append(missing, fmt.Sprintf("default_language %q is not in languages", r.spec.DefaultLanguage))
 	}
 	for _, name := range r.spec.Order {
 		g, ok := r.spec.Groups[name]
@@ -264,7 +288,18 @@ func (r *Responder) check() error {
 				missing = append(missing, name+"."+lang)
 			}
 		}
-		for _, s := range g.Text {
+	}
+	// The crisis route answers from self_harm directly, whether or not it is in order.
+	if _, ok := r.spec.Groups["self_harm"]; !ok {
+		missing = append(missing, `group "self_harm" is not defined`)
+	}
+	names := make([]string, 0, len(r.spec.Groups))
+	for name := range r.spec.Groups {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		for _, s := range r.spec.Groups[name].Text {
 			if strings.Contains(s, "{crisis_line}") && r.crisisLine == "" {
 				missing = append(missing, name+" needs a crisis line: set crisis_line_default or pass one")
 				break
@@ -278,7 +313,7 @@ func (r *Responder) check() error {
 		if r.spec.Unavailable[lang] == "" {
 			missing = append(missing, "unavailable."+lang)
 		}
-		if len(r.spec.Affirmation.Text) > 0 && r.spec.Affirmation.Text[lang] == "" {
+		if r.hasAffirmation && r.spec.Affirmation.Text[lang] == "" {
 			missing = append(missing, "sovereignty_affirmation."+lang)
 		}
 	}

@@ -15,5 +15,6 @@
 // state written by one language can be read by the others.
 package guardrail
 
-// Version is the package version, kept in step with the Python and TypeScript packages.
+// Version is the Go module version. It moves ahead of the Python and TypeScript packages when the
+// Go module ships something they have not released yet.
 const Version = "1.1.0"

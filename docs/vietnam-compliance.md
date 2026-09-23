@@ -46,7 +46,7 @@ unchanged from `standard-v1`.
 
 ## Step 4. Wire it into your application
 
-Python:
+Python (`Responder` ships in release `python-vietnam-compliance-v1`, branch `guardrail-vietnam-compliance`):
 
 ```python
 from guardrail_chatbot_jev import Guard, Responder, detect_language

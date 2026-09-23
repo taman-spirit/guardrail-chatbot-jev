@@ -345,3 +345,61 @@ func TestTheVietnamLabelledSetIsWellFormed(t *testing.T) {
 		t.Fatalf("%d cases, %d allowed", len(records), allowed)
 	}
 }
+
+// -- behaviour the random parity run does not reach ---------------------------------------------
+
+func TestTheAffirmationTriggerReadsAnyNumber(t *testing.T) {
+	r := vnResponder(t, "")
+	for _, value := range []any{0.9, 1, float32(0.9), json.Number("0.9")} {
+		v := Verdict{Action: Allow, Route: RouteDeliver, Signals: map[string]any{"sovereignty_question": value}}
+		if c, ok := r.Choose(vs(v), "vi"); !ok || c.Group != "affirmation" {
+			t.Fatalf("%T %v: no affirmation", value, value)
+		}
+	}
+	notNumber := Verdict{Action: Allow, Route: RouteDeliver, Signals: map[string]any{"sovereignty_question": true}}
+	if _, ok := r.Choose(vs(notNumber), "vi"); ok {
+		t.Fatal("a boolean is not a probability")
+	}
+}
+
+func TestComposeTrimsUnicodeSpaceLikePython(t *testing.T) {
+	r := vnResponder(t, "")
+	v := Verdict{Action: Allow, Route: RouteDeliver, Signals: map[string]any{"sovereignty_question": 0.9}}
+	if got := r.Compose("hi　 \n", vs(v), "vi"); !strings.HasPrefix(got, "hi\n\n") {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func responderFrom(t *testing.T, edit func(responses map[string]any)) (*Responder, error) {
+	t.Helper()
+	var pack map[string]any
+	data, _ := bundledPacks.ReadFile("policies/vietnam-compliance-v1.json")
+	_ = json.Unmarshal(data, &pack)
+	edit(pack["responses"].(map[string]any))
+	p, err := NewPolicy(pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return NewResponder(p, "")
+}
+
+func TestAResponsesSectionIsCheckedLikePython(t *testing.T) {
+	// No order falls back to every group, as Python does.
+	r, err := responderFrom(t, func(s map[string]any) { delete(s, "order") })
+	if err != nil || r == nil {
+		t.Fatalf("no order: %v", err)
+	}
+	// A broken section gives no Responder at all, never a half-built one.
+	cases := map[string]func(map[string]any){
+		"self_harm":                  func(s map[string]any) { delete(s["groups"].(map[string]any), "self_harm") },
+		"default_language":           func(s map[string]any) { s["default_language"] = "fr" },
+		"sovereignty_affirmation.zh": func(s map[string]any) { delete(s["sovereignty_affirmation"].(map[string]any), "text") },
+		"needs a crisis line":        func(s map[string]any) { delete(s, "crisis_line_default") },
+	}
+	for want, edit := range cases {
+		r, err := responderFrom(t, edit)
+		if err == nil || !strings.Contains(err.Error(), want) || r != nil {
+			t.Fatalf("%s: got %v, %v", want, r, err)
+		}
+	}
+}

@@ -47,7 +47,7 @@ Các nhóm an toàn chung (bạo lực, vũ khí, xâm hại trẻ em, tự hạ
 
 ## Bước 4. Tích hợp vào ứng dụng
 
-Python:
+Python (`Responder` có trong bản phát hành `python-vietnam-compliance-v1`, branch `guardrail-vietnam-compliance`):
 
 ```python
 from guardrail_chatbot_jev import Guard, Responder, detect_language

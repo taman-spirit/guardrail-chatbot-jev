@@ -31,13 +31,13 @@ fi
 
 mkdir -p "$out"
 status=0
-for pair in "input:cases-input" "output:cases-output" "conversation:conversations"; do
-  surface="${pair%%:*}"
-  name="${pair##*:}"
+for pair in "input:cases-input:standard-v1" "output:cases-output:standard-v1" \
+            "conversation:conversations:standard-v1" "input:cases-vietnam:vietnam-compliance-v1"; do
+  IFS=: read -r surface name pack <<< "$pair"
   echo >&2
   echo "== $surface ==" >&2
   python3 "$check" --surface "$surface" \
-    --jsonl "$root/examples/$name.jsonl" \
+    --jsonl "$root/examples/$name.jsonl" --policy "$pack" \
     --out "$out/$name.results.jsonl" \
     --record "$out/$name.answers.jsonl" \
     --expect expected_action --summary || status=$?
@@ -55,5 +55,9 @@ Raw answers are recorded, so tuning from here costs nothing:
       --from 0.2 --to 0.7 --step 0.05
 
 Start with separation. A threshold only helps where the two groups do not overlap.
+
+The Viet Nam set is decided by its own pack, so pass it when you replay:
+
+  scripts/sweep.py report --policy vietnam-compliance-v1 $out/cases-vietnam.answers.jsonl
 NEXT
 exit "$status"
