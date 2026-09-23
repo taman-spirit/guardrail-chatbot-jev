@@ -515,3 +515,87 @@ func TestChunksAreCutAtSentenceBoundariesInCharacters(t *testing.T) {
 		t.Fatalf("got %q", chunk)
 	}
 }
+
+// -- parity with Python on the edges the random run does not reach ---------------------------------
+
+func TestRoundingMatchesPython(t *testing.T) {
+	// Python's round() works on the exact binary value and sends an exact half to even.
+	cases := map[[2]float64]float64{{0.0625, 3}: 0.062, {0.125, 2}: 0.12, {2.675, 2}: 2.67, {2.5, 0}: 2}
+	for in, want := range cases {
+		if got := round(in[0], int(in[1])); got != want {
+			t.Fatalf("round(%v, %v) = %v, want %v", in[0], in[1], got, want)
+		}
+	}
+	s := NewSession("r")
+	s.Observe(Verdict{Action: Block, Surface: SurfaceInput})
+	for i := 0; i < 4; i++ {
+		s.Observe(Verdict{Action: Allow, Surface: SurfaceInput})
+	}
+	if got := s.Metadata()["session_risk"]; got != 0.062 {
+		t.Fatalf("session_risk = %v, want Python's 0.062", got)
+	}
+}
+
+func TestWholeNumbersFromJSONReadAsPythonInts(t *testing.T) {
+	var pack map[string]any
+	data, _ := bundledPacks.ReadFile("policies/standard-v1.json")
+	_ = json.Unmarshal(data, &pack)
+	pack["version"] = 2.0
+	p, err := NewPolicy(pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.QualifiedID() != "standard-v1@2" {
+		t.Fatalf("got %s", p.QualifiedID())
+	}
+	if r := RecordFromJSON(map[string]any{"id": 17.0}, ""); r.ID != "17" {
+		t.Fatalf("got %q", r.ID)
+	}
+}
+
+func TestPolicyFlagsReadAsPythonTruthiness(t *testing.T) {
+	var pack map[string]any
+	data, _ := bundledPacks.ReadFile("policies/standard-v1.json")
+	_ = json.Unmarshal(data, &pack)
+	cats := pack["categories"].(map[string]any)
+	cats["hte"].(map[string]any)["enabled"] = nil
+	cats["ncr"].(map[string]any)["enabled"] = 0.0
+	cats["vcr"].(map[string]any)["sentinel"] = 0.0
+	cats["elc"].(map[string]any)["sentinel"] = 1.0
+	cats["elc"].(map[string]any)["sentinel_instructions"] = "x"
+	pack["defaults"].(map[string]any)["on_error"] = nil
+	p, err := NewPolicy(pack)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Categories["hte"].Enabled || p.Categories["ncr"].Enabled || p.Categories["vcr"].Sentinel || !p.Categories["elc"].Sentinel {
+		t.Fatal("flags not read as Python's bool()")
+	}
+	if p.FailClosed(SurfaceOutput) {
+		t.Fatal("a null on_error fails open in Python")
+	}
+}
+
+func TestPrefilterBoundariesAreUnicodeAware(t *testing.T) {
+	pf := PatternPrefilter{Patterns: CommonPatterns}
+	p := bundled(t)
+	for _, text := range []string{"số012345678901", "012345678901đ"} {
+		if _, ok := pf.Decide(p, SurfaceInput, InputState(text, nil)); ok {
+			t.Fatalf("%q matched; Python's \\b sees no boundary there", text)
+		}
+	}
+	for _, text := range []string{"CCCD: 012345678901.", "012345678901"} {
+		if _, ok := pf.Decide(p, SurfaceInput, InputState(text, nil)); !ok {
+			t.Fatalf("%q did not match", text)
+		}
+	}
+}
+
+func TestCheckTurnFallsBackToTheSessionOnAnEmptyHistory(t *testing.T) {
+	session := NewSession("h")
+	session.AddTurn("user", "earlier")
+	got, _ := New(Options{Transport: NewRecordedTransport(clean)}).CheckTurn(ctx, "hi", "hello", &CheckOptions{Session: session, History: []Turn{}})
+	if _, ok := got[SurfaceConversation]; !ok {
+		t.Fatal("an empty history did not fall back to the session's")
+	}
+}

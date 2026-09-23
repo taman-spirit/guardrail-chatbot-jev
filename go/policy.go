@@ -4,9 +4,11 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -244,7 +246,7 @@ func (p *Policy) OnLowConfidence() string {
 // check is the last line and has nothing behind it.
 func (p *Policy) FailClosed(surface Surface) bool {
 	setting, ok := p.Defaults["on_error"]
-	if !ok || setting == nil {
+	if !ok {
 		return true
 	}
 	if perSurface, isMap := setting.(map[string]any); isMap {
@@ -344,12 +346,12 @@ func parseCategory(id string, m map[string]any) (*Category, error) {
 		Surfaces:             map[Surface]bool{},
 		Weight:               floatOr(m["weight"], 0.5),
 		BaseSeverity:         intOr(m["base_severity"], 2),
-		Sentinel:             m["sentinel"] == true,
+		Sentinel:             truthy(m["sentinel"]),
 		SentinelInstructions: stringOr(m["sentinel_instructions"], ""),
 		Thresholds:           map[string]Bands{},
 		Route:                Route(stringOr(m["route"], "")),
 		NeverBelow:           Action(stringOr(m["never_below"], "")),
-		Enabled:              m["enabled"] != false,
+		Enabled:              enabledOf(m),
 	}
 	surfaces := stringsOf(m["surfaces"])
 	if len(surfaces) == 0 {
@@ -455,11 +457,40 @@ func validate(p *Policy) error {
 	return nil
 }
 
+// stringOr reads an identifier or a name. JSON decodes every number as float64, so a whole number
+// is written without ".0": an "id": 17 in a record or "version": 2 in a pack reads as Python's int
+// does, and the policy id, the cache key and the reported case ids agree across languages.
 func stringOr(v any, fallback string) string {
 	if v == nil {
 		return fallback
 	}
+	if f, ok := v.(float64); ok && f == math.Trunc(f) && math.Abs(f) < 1e15 {
+		return strconv.FormatFloat(f, 'f', -1, 64)
+	}
 	return pyStr(v)
+}
+
+// truthy reads a flag the way Python's bool() does, so 1, 0 and null mean what they mean there.
+func truthy(v any) bool {
+	switch x := v.(type) {
+	case nil:
+		return false
+	case bool:
+		return x
+	case string:
+		return x != ""
+	case []any:
+		return len(x) > 0
+	case map[string]any:
+		return len(x) > 0
+	}
+	f, ok := toFloat(v)
+	return !ok || f != 0
+}
+
+func enabledOf(m map[string]any) bool {
+	v, ok := m["enabled"]
+	return !ok || truthy(v)
 }
 
 func mapOf(v any) map[string]any {

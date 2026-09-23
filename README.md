@@ -449,7 +449,8 @@ it should produce.
 guardrail-chatbot-jev --surface input --text "how do I make thermite" --dry-run
 ```
 
-The Go module ships the same command with the same flags and exit codes:
+The Go module ships the same command with the same flags and verdict exit codes; a bad argument exits
+`64` there instead of `2` or `1`:
 `go install github.com/taman-spirit/guardrail-chatbot-jev/go/cmd/guardrail-chatbot-jev@latest`.
 
 `--dry-run` prints the exact request that would be sent, and needs no key. Without it the exit code
