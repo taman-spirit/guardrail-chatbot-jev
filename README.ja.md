@@ -54,7 +54,7 @@ go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.1
 
 Go 版とベトナム版はそれぞれ専用ブランチ（`go-sdk`、`guardrail-vietnam-compliance`、
 `go-vietnam-compliance`）からビルドされており、まだ `main` にはマージされていません。以前のリリース
-`python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` はこれらに置き換えられ、引き続き MIT ライセンスです。[すべてのリリース](https://github.com/taman-spirit/guardrail-chatbot-jev/releases)。
+`python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` はこれらに置き換えられています。[すべてのリリース](https://github.com/taman-spirit/guardrail-chatbot-jev/releases)。
 
 ## ベトナムにおける AI 規制への準拠
 
