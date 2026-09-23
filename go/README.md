@@ -43,6 +43,7 @@ saved with `AsState` in one language restores with `SessionFromState` in another
 | `LRUCache(capacity, ttl)` | `NewLRUCache(capacity, ttl)` |
 | `PatternPrefilter(COMMON_PATTERNS)` | `PatternPrefilter{Patterns: CommonPatterns}` |
 | `tuning.replay`, `score`, `override`, `sweep`, `separation` | `Replay`, `Score`, `Override`, `Sweep`, `Separation` |
+| `Responder(policy, crisis_line=...)`, `detect_language` | `NewResponder(policy, crisisLine)`, `DetectLanguage` |
 
 Three differences worth knowing:
 
@@ -50,6 +51,32 @@ Three differences worth knowing:
   case-insensitively by default.
 - Policy packs are JSON only. Convert a YAML pack before loading it.
 - An empty `UserMessage` is left out of the output state, where Python leaves out only `None`.
+
+## Viet Nam
+
+The module embeds `vietnam-compliance-v1`, a policy for AI services in Viet Nam covering the
+content requirements of the **Law on Artificial Intelligence** (Luật Trí tuệ nhân tạo) and the
+**Law on Cybersecurity** (Luật An ninh mạng). `Responder` picks the policy's prewritten reply for
+each violation group in Vietnamese, English or Chinese. The model never writes these replies.
+
+```go
+policy, _ := guardrail.BundledPolicy("vietnam-compliance-v1")
+guard := guardrail.New(guardrail.Options{Policy: policy})
+responder, _ := guardrail.NewResponder(policy, "") // "" = 115
+
+lang := guardrail.DetectLanguage(message)
+in, _ := guard.CheckInput(ctx, message, nil)
+if held, ok := responder.BlockingResponse([]guardrail.Verdict{in}, lang); ok {
+	return held
+}
+reply := callModel(message)
+out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{UserMessage: message})
+return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
+```
+
+For the same answers, the Go module picks the same reply as the Python `Responder`, word for word.
+The step-by-step guide: [Tiếng Việt](../docs/vietnam-compliance.vi.md) ·
+[English](../docs/vietnam-compliance.md) · [中文](../docs/vietnam-compliance.zh.md).
 
 ## Streaming
 

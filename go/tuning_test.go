@@ -197,9 +197,13 @@ func TestSeparationCountsOnlyTheCasesACategoryOwns(t *testing.T) {
 
 func TestTheLabelledSetsUseKnownCategories(t *testing.T) {
 	// A typo in expected_category would silently make a category look like it never fires.
-	p := bundled(t)
 	paths, _ := filepath.Glob("../examples/*.jsonl")
 	for _, path := range paths {
+		// A labelled set for a derived pack is judged against that pack's categories.
+		p := bundled(t)
+		if filepath.Base(path) == "cases-vietnam.jsonl" {
+			p = vn(t)
+		}
 		records, err := LoadRecords(path, "")
 		if err != nil {
 			t.Fatal(err)

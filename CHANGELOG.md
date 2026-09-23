@@ -7,6 +7,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `vietnam-compliance-v1` in the Go module, for AI services in Viet Nam covering the content
+  requirements of the Law on Artificial Intelligence (Luật Trí tuệ nhân tạo) and the Law on
+  Cybersecurity (Luật An ninh mạng), with `NewResponder` and `DetectLanguage` for its prewritten
+  replies in Vietnamese, English and Chinese, and a step-by-step guide in `docs/`.
+
 - A Go module in `go/`, a port of the Python package: the three checks, `CheckTurn`, the cache,
   prefilter, session, streaming over channels, the recording transports, offline tuning and the
   command line. It embeds the same policy pack, sends the same request and reaches the same
