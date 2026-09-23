@@ -46,12 +46,15 @@ def test_disabled_categories_are_left_out(policy: Policy) -> None:
 
 
 def test_policy_copies_stay_in_sync() -> None:
-    canonical = json.loads((ROOT / "policies" / "standard-v1.json").read_text("utf-8"))
-    for copy in (
-        ROOT / "python" / "src" / "guardrail_chatbot_jev" / "policies" / "standard-v1.json",
-        ROOT / "ts" / "src" / "policies" / "standard-v1.json",
-    ):
-        assert json.loads(copy.read_text("utf-8")) == canonical, f"{copy} drifted; run scripts/sync-policies.sh"
+    packs = sorted((ROOT / "policies").glob("*.json"))
+    assert {p.name for p in packs} >= {"standard-v1.json", "vietnam-compliance-v1.json"}
+    for pack in packs:
+        canonical = json.loads(pack.read_text("utf-8"))
+        for copy in (
+            ROOT / "python" / "src" / "guardrail_chatbot_jev" / "policies" / pack.name,
+            ROOT / "ts" / "src" / "policies" / pack.name,
+        ):
+            assert json.loads(copy.read_text("utf-8")) == canonical, f"{copy} drifted; run scripts/sync-policies.sh"
 
 
 def test_bad_thresholds_are_rejected() -> None:

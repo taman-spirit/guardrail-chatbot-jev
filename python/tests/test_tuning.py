@@ -219,14 +219,17 @@ def test_the_labelled_sets_use_known_categories(policy: Policy) -> None:
     import pathlib as _pathlib
 
     root = _pathlib.Path(__file__).resolve().parents[2] / "examples"
+    # A labelled set for a derived pack is judged against that pack's categories.
+    packs = {"cases-vietnam.jsonl": Policy.bundled("vietnam-compliance-v1")}
     for path in sorted(root.glob("*.jsonl")):
+        known = packs.get(path.name, policy).categories
         for line in path.read_text("utf-8").splitlines():
             if not line.strip():
                 continue
             case = json.loads(line)
             category = case.get("expected_category")
             if category is not None:
-                assert category in policy.categories, f"{path.name}: {case['id']} -> {category!r}"
+                assert category in known, f"{path.name}: {case['id']} -> {category!r}"
 
 
 def test_probability_takes_the_higher_of_choice_and_sentinel() -> None:

@@ -3,6 +3,17 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- `vietnam-compliance-v1`, a policy pack for AI services in Viet Nam covering the content
+  requirements of the Law on Artificial Intelligence (Luật Trí tuệ nhân tạo) and the Law on
+  Cybersecurity (Luật An ninh mạng), with a labelled set for calibration.
+- `Responder`, which picks the pack's prewritten reply for a verdict in Vietnamese, English or
+  Chinese instead of letting the model write it.
+- `scripts/build-packs.py`, which builds derived packs from overlays in `policies/overlays/`.
+
 ## [1.0.0]
 
 First public release.

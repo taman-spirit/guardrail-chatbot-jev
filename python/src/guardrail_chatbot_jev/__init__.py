@@ -23,6 +23,7 @@ from .guard import Guard
 from .policy import Category, Policy
 from .prefilter import COMMON_PATTERNS, Pattern, PatternPrefilter, Prefilter, prefilter_verdict
 from .questions import build_questions, conversation_state, input_state, output_state
+from .responses import Choice, Responder, detect_language
 from .session import Session
 from .streaming import StreamEvent, guard_stream
 from .tuning import Record, Report
@@ -45,6 +46,7 @@ __all__ = [
     "Action",
     "Answers",
     "Category",
+    "Choice",
     "Finding",
     "Guard",
     "GuardrailError",
@@ -58,6 +60,7 @@ __all__ = [
     "RecordedTransport",
     "RecordingTransport",
     "Report",
+    "Responder",
     "SdkTransport",
     "Session",
     "StreamEvent",
@@ -73,6 +76,7 @@ __all__ = [
     "cache_key",
     "conversation_state",
     "decide",
+    "detect_language",
     "error_verdict",
     "guard_stream",
     "input_state",

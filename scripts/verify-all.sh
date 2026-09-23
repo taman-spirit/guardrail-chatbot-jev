@@ -36,6 +36,7 @@ run "the build loads and carries the pack" "cd ts && node -e \"
   })\""
 
 section "policy pack"
+run "derived packs are built from their overlays" "python3 scripts/build-packs.py --check"
 run "the three shipped copies are identical" "./scripts/sync-policies.sh >/dev/null && git diff --quiet -- python/src/guardrail_chatbot_jev/policies ts/src/policies"
 run "thresholds ordered, rules resolve" "python3 -c \"
 import sys; sys.path.insert(0, 'python/src')

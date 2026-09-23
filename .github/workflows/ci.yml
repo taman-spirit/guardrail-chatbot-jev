@@ -98,5 +98,6 @@ jobs:
         # Both packages ship a copy of policies/. A change that forgets to sync them would
         # otherwise leave the two languages enforcing different policies.
         run: |
+          python scripts/build-packs.py --check
           ./scripts/sync-policies.sh
           git diff --exit-code -- python/src/guardrail_chatbot_jev/policies ts/src/policies
