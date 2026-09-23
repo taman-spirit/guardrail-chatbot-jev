@@ -7,6 +7,7 @@ instead; anything with a ``system_one`` method will do.
 
 from __future__ import annotations
 
+import http.client
 import json
 import os
 import random
@@ -97,7 +98,13 @@ class HttpTransport:
                     raise last from exc
                 retry_after = exc.headers.get("retry-after") if exc.headers else None
                 delay = min(float(retry_after), self.backoff_max) if _is_number(retry_after) else delay
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            except (
+                urllib.error.URLError,
+                http.client.HTTPException,
+                ConnectionError,
+                TimeoutError,
+                json.JSONDecodeError,
+            ) as exc:
                 last = GuardrailError(f"Jev API unreachable: {exc}")
                 if attempt == self.max_retries:
                     raise last from exc
