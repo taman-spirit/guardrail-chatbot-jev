@@ -522,4 +522,4 @@ which is also how you should test your own policy changes.
 
 [CC BY-NC 4.0](../LICENSE): Creative Commons Attribution-NonCommercial 4.0 International. You may use,
 share and adapt it for non-commercial purposes, with attribution. Commercial use needs separate
-permission from the copyright holder. Releases published before this change (`python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1`) remain under MIT.
+permission from the copyright holder.

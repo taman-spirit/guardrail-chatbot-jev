@@ -561,5 +561,4 @@ Pour signaler une vulnérabilité, voir [SECURITY.md](SECURITY.md).
 
 [CC BY-NC 4.0](LICENSE) : Creative Commons Attribution - Pas d'utilisation commerciale 4.0 International.
 Vous pouvez l'utiliser, le partager et l'adapter à des fins non commerciales, en citant l'auteur. Tout
-usage commercial nécessite une autorisation distincte du titulaire des droits. Les versions publiées
-avant ce changement (`python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1`) restent sous licence MIT.
+usage commercial nécessite une autorisation distincte du titulaire des droits.
