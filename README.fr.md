@@ -37,6 +37,44 @@ décide de la suite. Elle fonctionne en **Python et en TypeScript**, et les deux
 fichier de politique : les deux moitiés de votre pile ne peuvent donc pas diverger. Aucun des deux
 paquets n'a de dépendance tierce.
 
+## Versions publiées
+
+| Version | Tag | Contenu |
+| --- | --- | --- |
+| [Python SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.0) | `python/v1.0.0` | Le paquet Python : trois vérifications, cache, préfiltre, sessions, streaming, réglage hors ligne et CLI |
+| [Go SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.0.0) | `go/v1.0.0` | Un portage Go du paquet Python, qui lit la même politique et rend les mêmes verdicts |
+| [Python : politique de conformité Viet Nam v1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1) | `python-vietnam-compliance-v1` | La politique `vietnam-compliance-v1`, avec des réponses prérédigées en vietnamien, anglais et chinois |
+| [Go : politique de conformité Viet Nam v1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1) | `go-vietnam-compliance-v1` | La même politique et les mêmes réponses en Go, version de module `v1.1.0` |
+
+Chaque note de version indique ce qu'elle contient et comment l'installer. Dans le même ordre :
+
+```bash
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.0.0#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.0.0
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.0
+```
+
+Les versions Go et Viet Nam sont construites depuis leurs propres branches (`go-sdk`,
+`guardrail-vietnam-compliance`, `go-vietnam-compliance`), pas encore fusionnées dans `main`.
+[Toutes les versions](https://github.com/taman-spirit/guardrail-chatbot-jev/releases).
+
+## Conformité de l'IA au Viet Nam
+
+Pour les services d'IA au Viet Nam, la politique `vietnam-compliance-v1` couvre les exigences de
+contenu de deux lois :
+
+- **Loi sur l'intelligence artificielle** (Luật Trí tuệ nhân tạo)
+- **Loi sur la cybersécurité** (Luật An ninh mạng)
+
+Elle ajoute ses règles à la taxonomie commune, répond à chaque groupe de violations par une réponse
+prérédigée en vietnamien, anglais ou chinois au lieu de laisser le modèle l'écrire, et est conçue pour
+ne pas bloquer les questions ordinaires. Calibrez-la sur votre propre trafic avant la mise en
+production.
+
+Le guide de conformité pas à pas couvre le périmètre, la transparence, les contenus interdits,
+l'intégration en Python et en Go, le calibrage, la supervision humaine et la traçabilité : **[Tiếng Việt](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.vi.md) · [English](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.md) · [中文](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.zh.md)**.
+
 ## Le fonctionnement en une image
 
 ```
