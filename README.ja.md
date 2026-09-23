@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/taman-spirit/guardrail-chatbot-jev/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/taman-spirit/guardrail-chatbot-jev/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <a href="LICENSE"><img alt="License: CC BY-NC 4.0" src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey.svg"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg">
   <img alt="Node 20+" src="https://img.shields.io/badge/node-20%2B-brightgreen.svg">
 </p>
@@ -531,4 +531,4 @@ cd ts && npm test                     # 57 tests
 
 ## ライセンス
 
-[MIT](LICENSE)。商用を含めどこでも使えます。著作権表示はそのまま残してください。
+[CC BY-NC 4.0](LICENSE)（クリエイティブ・コモンズ 表示 - 非営利 4.0 国際）。クレジットを表示すれば、非営利目的に限り利用・共有・改変できます。商用利用には著作権者の個別の許諾が必要です。この変更より前に公開されたリリース（`python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1`）は引き続き MIT ライセンスです。
