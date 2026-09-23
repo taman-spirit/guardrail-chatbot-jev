@@ -39,24 +39,25 @@ paquets n'a de dépendance tierce.
 
 ## Versions publiées
 
-| Version | Tag | Contenu |
-| --- | --- | --- |
-| [Python SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.0) | `python/v1.0.0` | Le paquet Python : trois vérifications, cache, préfiltre, sessions, streaming, réglage hors ligne et CLI |
-| [Go SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.0.0) | `go/v1.0.0` | Un portage Go du paquet Python, qui lit la même politique et rend les mêmes verdicts |
-| [Python : politique de conformité Viet Nam v1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1) | `python-vietnam-compliance-v1` | La politique `vietnam-compliance-v1`, avec des réponses prérédigées en vietnamien, anglais et chinois |
-| [Go : politique de conformité Viet Nam v1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1) | `go-vietnam-compliance-v1` | La même politique et les mêmes réponses en Go, version de module `v1.1.0` |
+| Version | Tag | Contenu | Licence |
+| --- | --- | --- | --- |
+| [Python SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.0) | `python/v1.0.0` | Le paquet Python : trois vérifications, cache, préfiltre, sessions, streaming, réglage hors ligne et CLI | MIT |
+| [Go SDK 1.0.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.0.1) | `go/v1.0.1` | Un portage Go du paquet Python, qui lit la même politique et rend les mêmes verdicts | CC BY-NC 4.0 |
+| [Python : politique de conformité Viet Nam v1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.1) | `python-vietnam-compliance-v1.1` | La politique `vietnam-compliance-v1`, avec des réponses prérédigées en vietnamien, anglais et chinois | CC BY-NC 4.0 |
+| [Go : politique de conformité Viet Nam v1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.1) | `go-vietnam-compliance-v1.1` | La même politique et les mêmes réponses en Go, version de module `v1.1.1` | CC BY-NC 4.0 |
 
 Chaque note de version indique ce qu'elle contient et comment l'installer. Dans le même ordre :
 
 ```bash
 pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.0.0#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.0.0
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.0
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.0.1
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.1#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.1
 ```
 
 Les versions Go et Viet Nam sont construites depuis leurs propres branches (`go-sdk`,
-`guardrail-vietnam-compliance`, `go-vietnam-compliance`), pas encore fusionnées dans `main`.
+`guardrail-vietnam-compliance`, `go-vietnam-compliance`), pas encore fusionnées dans `main`. Les
+versions antérieures `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` sont remplacées par celles-ci et restent sous licence MIT.
 [Toutes les versions](https://github.com/taman-spirit/guardrail-chatbot-jev/releases).
 
 ## Conformité de l'IA au Viet Nam
