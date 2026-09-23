@@ -79,6 +79,7 @@ class Responder:
             for category in self._groups[name].get("categories") or ():
                 self._by_category.setdefault(category, name)
         self._affirmation: Mapping[str, Any] = spec.get("sovereignty_affirmation") or {}
+        self._quiet_after = set(self._affirmation.get("not_after_rules") or ())
         self._affirm_groups = {"sovereignty"}
         _check(self)
 
@@ -116,7 +117,12 @@ class Responder:
                 return Choice("affirmation", self.affirmation(language), True)
             return None
 
-        verdict = max(held, key=lambda v: rank(v.action))
+        # The strongest verdict answers. At equal rank a real verdict beats one from an outage, and
+        # the crisis route beats everything, so a person at risk never gets a maintenance notice.
+        verdict = max(
+            held,
+            key=lambda v: (rank(v.action), v.route == "crisis_support", not v.degraded),
+        )
         if verdict.degraded:
             group, text = "unavailable", self._text(self.spec.get("unavailable") or {}, language)
         elif verdict.route == "crisis_support":
@@ -139,29 +145,43 @@ class Responder:
     # -- internals ------------------------------------------------------
 
     def _group_for(self, verdicts: list[Verdict]) -> str:
-        fired = {f.category for v in verdicts for f in v.findings if rank(f.action) >= rank("flag")}
+        """The group of the finding that caused the hold, with ``order`` only breaking ties.
+
+        A fake-news block that also carries a minor flag elsewhere is answered as fake news: the
+        reply should name what actually stopped the content.
+        """
+        findings = [f for v in verdicts for f in v.findings if rank(f.action) >= rank("flag")]
+        if findings:
+            top = max(rank(f.action) for f in findings)
+            fired = {f.category for f in findings if rank(f.action) == top}
+            for name in self._order:
+                if fired.intersection(self._groups[name].get("categories") or ()):
+                    return name
         for name in self._order:
-            categories = self._groups[name].get("categories") or ()
-            if "*" in categories or fired.intersection(categories):
+            if "*" in (self._groups[name].get("categories") or ()):
                 return name
         return self._order[-1]
 
     def _touches_sovereignty(self, verdict: Verdict) -> bool:
-        for finding in verdict.findings:
+        # A finding a neutral-mention rule settled is not a claim, so it does not earn the statement.
+        quiet = bool(self._quiet_after.intersection(verdict.applied_rules))
+        for finding in () if quiet else verdict.findings:
             if self._by_category.get(finding.category) in self._affirm_groups and rank(finding.action) >= rank("flag"):
                 return True
         signal = self._affirmation.get("trigger_signal")
         value = verdict.signals.get(signal) if signal else None
         threshold = float(self._affirmation.get("trigger_value", 0.6))
-        return isinstance(value, (int, float)) and value >= threshold
+        return isinstance(value, (int, float)) and not isinstance(value, bool) and value >= threshold
 
     def _group_text(self, group: str, language: str | None) -> str:
         spec = self._groups[group]
         return self._text(spec.get("text") or {}, language).replace("{crisis_line}", self.crisis_line)
 
     def _text(self, texts: Mapping[str, str], language: str | None) -> str:
-        lang = language if language in texts else self.default_language
-        return str(texts.get(lang) or next(iter(texts.values()), ""))
+        for lang in (language, self.default_language, *self.languages):
+            if lang and texts.get(lang):
+                return str(texts[lang])
+        return ""
 
 
 def _check(responder: Responder) -> None:
@@ -175,6 +195,11 @@ def _check(responder: Responder) -> None:
         for lang in responder.languages:
             if not (responder._groups[name].get("text") or {}).get(lang):
                 missing.append(f"{name}.{lang}")
+    if responder.default_language not in responder.languages:
+        missing.append(f"default_language {responder.default_language!r} is not in languages")
+    if "self_harm" not in responder._groups:
+        # The crisis route answers from this group directly, whether or not it is in order.
+        missing.append("group 'self_harm' is not defined")
     for key in ("review", "unavailable"):
         for lang in responder.languages:
             if not (spec.get(key) or {}).get(lang):

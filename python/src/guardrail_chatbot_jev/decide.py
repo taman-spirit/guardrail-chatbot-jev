@@ -65,9 +65,16 @@ def decide(
         action = stronger(action, floor)
 
     confidence = _overall_confidence(answers, findings, confidences)
-    action, escalated = _confidence_gate(policy, action, confidence, findings, probabilities, surface)
-    if escalated:
-        applied.append("confidence-gate")
+    # A rule can vouch for the content strongly enough that low confidence is not a reason to hold
+    # it, such as a pack's "this only mentions a place" rule. Floors still apply.
+    gate_off = any(
+        (rule.get("then") or {}).get("skip_confidence_gate") and rule.get("id") in applied
+        for rule in policy.rules
+    )
+    if not gate_off:
+        action, escalated = _confidence_gate(policy, action, confidence, findings, probabilities, surface)
+        if escalated:
+            applied.append("confidence-gate")
 
     findings.sort(key=lambda f: (-rank(f.action), -f.probability))
     route = _route(policy, findings, action)
@@ -336,11 +343,13 @@ def _route(policy: Policy, findings: list[Finding], action: Action) -> Route:
 
     The action says whether the content goes out; the route says what to do about it.
     """
+    # Only a finding that still counts sets the handling: one a rule capped to allow is a record,
+    # not a reason to redact.
     hazard_route = next(
         (
             policy.categories[f.category].route
             for f in findings
-            if policy.categories[f.category].route in _CATEGORY_ROUTES
+            if rank(f.action) >= rank("flag") and policy.categories[f.category].route in _CATEGORY_ROUTES
         ),
         None,
     )

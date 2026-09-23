@@ -43,6 +43,7 @@ export interface RuleSpec {
     readonly cap_action?: string;
     readonly floor_action?: string;
     readonly add_finding?: string;
+    readonly skip_confidence_gate?: boolean;
   };
   readonly why?: string;
 }

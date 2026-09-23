@@ -8,6 +8,10 @@ An overlay is layered on standard-v1 instead of forking it, so a change to the s
 reaches every derived pack on the next build. Categories and signals merge by key, a rule with a
 shipped id updates that rule in place, and anything else at the top level replaces the base value.
 
+The merge is one level deep. A category or signal patch replaces each key it names whole, so a
+patch that sets "thresholds" replaces every surface's bands, not just the ones it lists; a rule
+patch replaces "when" or "then" whole in the same way. Restate what you mean to keep.
+
 One macro keeps rule exceptions readable: "$all_but:a,b" in except_categories expands to every
 category in the built pack except a and b, which is how a rule is made to apply to only a few.
 

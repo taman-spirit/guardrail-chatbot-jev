@@ -64,7 +64,7 @@ def handle(message: str) -> str:
     return responder.compose(reply, [verdict_in, verdict_out], language=lang)
 ```
 
-Go:
+Go (ships in release `go-vietnam-compliance-v1`, module `v1.1.0` and later):
 
 ```go
 policy, _ := guardrail.BundledPolicy("vietnam-compliance-v1")
@@ -100,9 +100,11 @@ return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
 A wrong block is an error too. The policy reduces false positives in two ways:
 
 1. **Neutral mentions.** When content only mentions a place, a person or an organization (weather,
-   travel, a title, the news), the result is capped at a flag and is never blocked.
+   travel, a title, the news), the result is capped at a flag: it is not blocked, not held because
+   the model is unsure, and gets no sovereignty statement. Only a conversation that is escalating
+   as a whole still holds that turn for review.
 2. **Organizations are not individuals.** An organization's public contact details are not personal
-   data, and are not redacted.
+   data. They are neither redacted nor held, in conversation checks too.
 
 Examples that must pass:
 

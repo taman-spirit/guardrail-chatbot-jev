@@ -62,9 +62,14 @@ export function decide(
   for (const floor of floors.actions) action = stronger(action, floor);
 
   const confidence = overallConfidence(answers, findings, confidences);
-  const gated = confidenceGate(policy, action, confidence, findings, probabilities, surface);
-  if (gated !== action) applied.push("confidence-gate");
-  action = gated;
+  // A rule can vouch for the content strongly enough that low confidence is not a reason to hold
+  // it, such as a pack's "this only mentions a place" rule. Floors still apply.
+  const gateOff = policy.rules.some((rule) => rule.then?.skip_confidence_gate && applied.includes(rule.id));
+  if (!gateOff) {
+    const gated = confidenceGate(policy, action, confidence, findings, probabilities, surface);
+    if (gated !== action) applied.push("confidence-gate");
+    action = gated;
+  }
 
   findings.sort((a, b) => rank(b.action) - rank(a.action) || b.probability - a.probability);
   const route = resolveRoute(policy, findings, action);
@@ -370,7 +375,10 @@ function confidenceGate(
  * The action says whether the content goes out; the route says what to do about it.
  */
 function resolveRoute(policy: Policy, findings: readonly Finding[], action: Action): Route {
+  // Only a finding that still counts sets the handling: one a rule capped to allow is a record,
+  // not a reason to redact.
   const hazardRoute = findings
+    .filter((f) => rank(f.action) >= rank("flag"))
     .map((f) => policy.categories.get(f.category)?.route)
     .find((route): route is NonNullable<typeof route> => !!route && CATEGORY_ROUTES.has(route));
 

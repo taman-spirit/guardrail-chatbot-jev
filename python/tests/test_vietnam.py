@@ -185,7 +185,7 @@ def test_insulting_a_leader_gets_its_own_reply(vn: Policy, responder: Responder)
     verdict = decide(vn, "input", vn_answers(s_vld=noul(0.85)))
     assert verdict.action == "block"
     text = responder.blocking_response([verdict], language="vi")
-    assert text is not None and "xúc phạm lãnh tụ" in text
+    assert text is not None and "bịa đặt về lãnh tụ" in text
     assert "Hiến pháp" not in text, "no sovereignty statement where sovereignty was not involved"
 
 
@@ -309,3 +309,70 @@ def test_the_labelled_set_is_well_formed(vn: Policy) -> None:
         assert row["expected_action"] in ("allow", "flag", "review", "block"), row["id"]
         category = row.get("expected_category")
         assert category is None or category in vn.categories, row["id"]
+
+
+# -- review fixes: paths the first version got wrong ---------------------------------------
+
+
+def test_a_neutral_mention_is_not_held_on_low_confidence(vn: Policy, responder: Responder) -> None:
+    """The confidence gate must not undo the neutral-mention rule: low confidence alone holds nothing."""
+    for s_vsv in (0.1, 0.3):
+        verdict = decide(
+            vn, "input", vn_answers(hazard=hazard({}, confidence=0.5), neutral_mention=noul(0.97), s_vsv=noul(s_vsv))
+        )
+        assert verdict.deliverable, (s_vsv, verdict.action)
+        assert "confidence-gate" not in verdict.applied_rules
+        reply = "Trường Sa hôm nay nắng."
+        assert responder.compose(reply, [verdict]) == reply, "a settled neutral mention earns no statement"
+
+
+def test_a_conversation_floor_still_applies_to_a_neutral_mention(vn: Policy) -> None:
+    """Escalation across the whole conversation is a different signal, and it still holds."""
+    verdict = decide(vn, "conversation", vn_answers(neutral_mention=noul(0.97), escalation=score(3.4)))
+    assert verdict.action == "review"
+
+
+@pytest.mark.parametrize("surface", ["output", "conversation"])
+def test_a_hotline_is_never_redacted_even_beside_another_flag(vn: Policy, surface: str) -> None:
+    parts = dict(s_prv=noul(0.45), data_subject=choice("organization"), refusal=noul(0.0))
+    for extra in ({}, {"hazard": hazard({"hte": 0.2})}, {"hazard": hazard({}, confidence=0.4)}):
+        verdict = decide(vn, surface, vn_answers(**parts, **extra))  # type: ignore[arg-type]
+        assert verdict.route != "redact", (surface, extra, verdict.route)
+        assert verdict.deliverable, (surface, extra)
+
+
+def test_the_reply_names_what_actually_stopped_the_content(vn: Policy, responder: Responder) -> None:
+    """A fake-news block that also carries a minor sovereignty flag is answered as fake news."""
+    verdict = decide(vn, "input", vn_answers(hazard=hazard({"vcs": 0.8, "vsv": 0.2}), actionability=score(2.0)))
+    assert verdict.action == "block"
+    choice_ = responder.choose([verdict], "vi")
+    assert choice_ is not None and choice_.group == "cybersecurity"
+    assert choice_.affirmed, "the genuine sovereignty flag still ends the reply with the statement"
+
+
+def test_intellectual_property_is_not_answered_as_personal_data(vn: Policy, responder: Responder) -> None:
+    verdict = decide(vn, "output", vn_answers(hazard=hazard({"ipv": 0.9}), refusal=noul(0.0), actionability=score(2.0)))
+    choice_ = responder.choose([verdict], "en")
+    assert choice_ is not None and choice_.group == "general"
+
+
+def test_an_outage_never_replaces_the_crisis_reply(vn: Policy, responder: Responder) -> None:
+    crisis = decide(vn, "input", vn_answers(s_ssh=noul(0.25)))
+    assert crisis.route == "crisis_support"
+    outage = error_verdict(vn, "output", GuardrailError("down"))
+    assert outage.action == crisis.action == "review"
+    choice_ = responder.choose([outage, crisis], "vi")
+    assert choice_ is not None and choice_.group == "self_harm"
+
+
+def test_a_boolean_signal_is_not_a_probability(vn: Policy, responder: Responder) -> None:
+    verdict = decide(vn, "input", vn_answers())
+    faked = type(verdict)(**{**{f: getattr(verdict, f) for f in verdict.__slots__}, "signals": {"sovereignty_question": True}})
+    assert responder.choose([faked], "vi") is None
+
+
+def test_the_leaders_reply_covers_fabrications_in_every_language(responder: Responder, vn: Policy) -> None:
+    verdict = decide(vn, "input", vn_answers(s_vld=noul(0.85)))
+    for lang, word in (("vi", "bịa đặt"), ("en", "fabrications"), ("zh", "捏造")):
+        text = responder.blocking_response([verdict], language=lang)
+        assert text is not None and word in text, lang
