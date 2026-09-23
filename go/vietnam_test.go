@@ -213,7 +213,7 @@ func TestEachGroupHasItsOwnReply(t *testing.T) {
 	}
 	leader := decideOn(p, SurfaceInput, vnAnswers(A{"s_vld": noul(0.85)}))
 	text, _ := r.BlockingResponse(vs(leader), "vi")
-	if !strings.Contains(text, "xúc phạm lãnh tụ") || strings.Contains(text, "Hiến pháp") {
+	if !strings.Contains(text, "bịa đặt về lãnh tụ") || strings.Contains(text, "Hiến pháp") {
 		t.Fatalf("leaders: %q", text)
 	}
 	if bio := decideOn(p, SurfaceInput, vnAnswers(A{"neutral_mention": noul(0.9), "s_vld": noul(0.03)})); bio.Action != Allow {
@@ -401,5 +401,64 @@ func TestAResponsesSectionIsCheckedLikePython(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), want) || r != nil {
 			t.Fatalf("%s: got %v, %v", want, r, err)
 		}
+	}
+}
+
+// -- review fixes: paths the first version got wrong ---------------------------------------------
+
+func TestANeutralMentionIsNotHeldOnLowConfidence(t *testing.T) {
+	r := vnResponder(t, "")
+	for _, sVsv := range []float64{0.1, 0.3} {
+		v := decideOn(vn(t), SurfaceInput, vnAnswers(A{"hazard": hazard(nil, 0.5), "neutral_mention": noul(0.97), "s_vsv": noul(sVsv)}))
+		if !v.Deliverable() || v.HasRule("confidence-gate") {
+			t.Fatalf("s_vsv=%v: %s %v", sVsv, v.Action, v.AppliedRules)
+		}
+		if got := r.Compose("Trường Sa hôm nay nắng.", vs(v), "vi"); got != "Trường Sa hôm nay nắng." {
+			t.Fatalf("a settled neutral mention earns no statement: %q", got)
+		}
+	}
+	// Escalation across the whole conversation is a different signal, and it still holds.
+	conv := decideOn(vn(t), SurfaceConversation, vnAnswers(A{"neutral_mention": noul(0.97), "escalation": score(3.4)}))
+	if conv.Action != Review {
+		t.Fatalf("got %s", conv.Action)
+	}
+}
+
+func TestAHotlineIsNeverRedactedEvenBesideAnotherFlag(t *testing.T) {
+	for _, surface := range []Surface{SurfaceOutput, SurfaceConversation} {
+		for _, extra := range []A{{}, {"hazard": hazard(P{"hte": 0.2})}, {"hazard": hazard(nil, 0.4)}} {
+			parts := A{"s_prv": noul(0.45), "data_subject": choice("organization"), "refusal": noul(0)}
+			for k, v := range extra {
+				parts[k] = v
+			}
+			v := decideOn(vn(t), surface, vnAnswers(parts))
+			if v.Route == RouteRedact || !v.Deliverable() {
+				t.Fatalf("%s %v: %s %s", surface, extra, v.Action, v.Route)
+			}
+		}
+	}
+}
+
+func TestTheReplyNamesWhatActuallyStoppedTheContent(t *testing.T) {
+	r := vnResponder(t, "")
+	v := decideOn(vn(t), SurfaceInput, vnAnswers(A{"hazard": hazard(P{"vcs": 0.8, "vsv": 0.2}), "actionability": score(2)}))
+	c, ok := r.Choose(vs(v), "vi")
+	if v.Action != Block || !ok || c.Group != "cybersecurity" || !c.Affirmed {
+		t.Fatalf("%s %+v", v.Action, c)
+	}
+	ipv := decideOn(vn(t), SurfaceOutput, vnAnswers(A{"hazard": hazard(P{"ipv": 0.9}), "refusal": noul(0), "actionability": score(2)}))
+	if c, _ := r.Choose(vs(ipv), "en"); c.Group != "general" {
+		t.Fatalf("intellectual property answered as %s", c.Group)
+	}
+}
+
+func TestAnOutageNeverReplacesTheCrisisReply(t *testing.T) {
+	crisis := decideOn(vn(t), SurfaceInput, vnAnswers(A{"s_ssh": noul(0.25)}))
+	outage := ErrorVerdict(vn(t), SurfaceOutput, &Error{Msg: "down"}, 0)
+	if crisis.Route != RouteCrisisSupport || outage.Action != crisis.Action {
+		t.Fatalf("setup: %s %s / %s", crisis.Action, crisis.Route, outage.Action)
+	}
+	if c, _ := vnResponder(t, "").Choose(vs(outage, crisis), "vi"); c.Group != "self_harm" {
+		t.Fatalf("got %s", c.Group)
 	}
 }

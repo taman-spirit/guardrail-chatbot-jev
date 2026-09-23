@@ -69,6 +69,7 @@ type responsesSpec struct {
 	Affirmation       struct {
 		TriggerSignal string   `json:"trigger_signal"`
 		TriggerValue  *float64 `json:"trigger_value"`
+		NotAfterRules []string `json:"not_after_rules"`
 		Text          texts    `json:"text"`
 	} `json:"sovereignty_affirmation"`
 }
@@ -175,9 +176,11 @@ func (r *Responder) Choose(verdicts []Verdict, lang string) (Choice, bool) {
 		return Choice{}, false
 	}
 
+	// The strongest verdict answers. At equal rank the crisis route beats everything and a real
+	// verdict beats one from an outage, so a person at risk never gets a maintenance notice.
 	verdict := held[0]
 	for _, v := range held[1:] {
-		if Rank(v.Action) > Rank(verdict.Action) {
+		if outranks(v, verdict) {
 			verdict = v
 		}
 	}
@@ -209,27 +212,73 @@ func (r *Responder) Choose(verdicts []Verdict, lang string) (Choice, bool) {
 
 // -- internals ------------------------------------------------------------------
 
+func outranks(a, b Verdict) bool {
+	key := func(v Verdict) [3]int {
+		crisis, real := 0, 0
+		if v.Route == RouteCrisisSupport {
+			crisis = 1
+		}
+		if !v.Degraded {
+			real = 1
+		}
+		return [3]int{Rank(v.Action), crisis, real}
+	}
+	ka, kb := key(a), key(b)
+	for i := range ka {
+		if ka[i] != kb[i] {
+			return ka[i] > kb[i]
+		}
+	}
+	return false
+}
+
+// groupFor is the group of the finding that caused the hold, with the order only breaking ties.
+// A fake-news block that also carries a minor flag elsewhere is answered as fake news: the reply
+// should name what actually stopped the content.
 func (r *Responder) groupFor(verdicts []Verdict) string {
-	fired := map[string]bool{}
+	top := -1
 	for _, v := range verdicts {
 		for _, f := range v.Findings {
 			if Rank(f.Action) >= Rank(Flag) {
+				top = max(top, Rank(f.Action))
+			}
+		}
+	}
+	fired := map[string]bool{}
+	for _, v := range verdicts {
+		for _, f := range v.Findings {
+			if top >= 0 && Rank(f.Action) == top {
 				fired[f.Category] = true
 			}
 		}
 	}
 	for _, name := range r.spec.Order {
 		for _, c := range r.spec.Groups[name].Categories {
-			if c == "*" || fired[c] {
+			if fired[c] {
 				return name
 			}
+		}
+	}
+	for _, name := range r.spec.Order {
+		if slices.Contains(r.spec.Groups[name].Categories, "*") {
+			return name
 		}
 	}
 	return r.spec.Order[len(r.spec.Order)-1]
 }
 
 func (r *Responder) touchesSovereignty(v Verdict) bool {
+	// A finding a neutral-mention rule settled is not a claim, so it does not earn the statement.
+	quiet := false
+	for _, rule := range r.spec.Affirmation.NotAfterRules {
+		if slices.Contains(v.AppliedRules, rule) {
+			quiet = true
+		}
+	}
 	for _, f := range v.Findings {
+		if quiet {
+			break
+		}
 		if affirmGroups[r.byCategory[f.Category]] && Rank(f.Action) >= Rank(Flag) {
 			return true
 		}

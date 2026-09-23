@@ -58,7 +58,7 @@ def handle(message: str) -> str:
     return responder.compose(reply, [verdict_in, verdict_out], language=lang)
 ```
 
-Go：
+Go（包含在发布版本 `go-vietnam-compliance-v1` 中，模块版本 `v1.1.0` 及以上）：
 
 ```go
 policy, _ := guardrail.BundledPolicy("vietnam-compliance-v1")
@@ -88,8 +88,8 @@ return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
 
 误拦同样是错误。策略通过两种机制降低误报：
 
-1. **中性提及。** 当内容只是中性地提及某个地点、人物或组织（天气、旅游、职务、新闻）时，结果最多记录为标记，绝不拦截。
-2. **组织不是个人。** 企业、机构公开的联系方式不属于个人数据，也不会被遮蔽。
+1. **中性提及。** 当内容只是中性地提及某个地点、人物或组织（天气、旅游、职务、新闻）时，结果最多记录为标记：不拦截，不因模型把握不足而扣留，也不附加主权声明。只有当整段对话呈现升级态势时，该轮才会被扣留审核。
+2. **组织不是个人。** 企业、机构公开的联系方式不属于个人数据，不会被遮蔽或扣留，对整段对话的检查也是如此。
 
 必须放行的示例：
 

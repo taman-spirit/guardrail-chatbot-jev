@@ -63,6 +63,7 @@
       "thresholds": {"default": {"block": 0.55, "review": 0.3, "flag": 0.15}}
     },
     "prv": {
+      "refs": ["Luật An ninh mạng"],
       "description": "Personal data of an identifiable natural person, meaning a private individual: identifiers such as a citizen ID (CCCD) number, personal phone numbers, home addresses, personal email, bank accounts, health or location data, or requests to find, profile, dox or track a specific person. It covers individuals only. It is not the published contact details of an organization, business, brand, agency or public office, such as a hotline, customer-service or support number, support email, office address, website or tax code.",
       "sentinel_instructions": "The content contains personal data of an identifiable private individual, or asks to find, infer, expose or track a specific person. The public contact details of a company, brand, agency or public office, such as a hotline, customer-service number or support email, are not personal data."
     }
@@ -80,7 +81,7 @@
     },
     "data_subject": {
       "type": "choice",
-      "surfaces": ["input", "output"],
+      "surfaces": ["input", "output", "conversation"],
       "instructions": "Whose personal or contact data does the content ask for or disclose?",
       "criteria": {
         "none": "No personal or contact data is involved.",
@@ -106,15 +107,15 @@
       "id": "neutral-mention-is-not-a-violation",
       "when": {"signal": "neutral_mention", "op": ">=", "value": 0.85},
       "except_categories": ["$all_but:vsv,vas,vld,vcs,prv"],
-      "then": {"cap_action": "flag"},
-      "why": "A question about the weather on Trường Sa, or a leader's official title, names the subject without violating anything. It is never blocked; at most it is recorded."
+      "then": {"cap_action": "flag", "skip_confidence_gate": true},
+      "why": "A question about the weather on Trường Sa, or a leader's official title, names the subject without violating anything. It is never blocked or held for low confidence alone; at most it is recorded."
     },
     {
       "id": "organization-contact-is-public",
       "when": {"signal": "data_subject", "op": "==", "value": "organization"},
       "except_categories": ["$all_but:prv"],
-      "then": {"cap_action": "allow"},
-      "why": "Personal data protection covers natural persons. A hotline or a customer-service number is published so that people use it."
+      "then": {"cap_action": "allow", "skip_confidence_gate": true},
+      "why": "Personal data protection covers natural persons. A hotline or a customer-service number is published so that people use it, so it is neither held nor redacted."
     }
   ],
   "responses": {
@@ -142,9 +143,9 @@
       "leaders": {
         "categories": ["vld"],
         "text": {
-          "vi": "Mình không thể tạo nội dung xúc phạm lãnh tụ, lãnh đạo Đảng và Nhà nước, anh hùng dân tộc hay biểu tượng quốc gia của Việt Nam, vì điều này trái với Luật An ninh mạng. Nếu bạn muốn, mình có thể cung cấp thông tin khách quan về tiểu sử, vai trò hoặc sự nghiệp của các nhân vật này.",
-          "en": "I can't create content that insults Viet Nam's leaders, national heroes or national symbols, because it is prohibited under the Law on Cybersecurity. If you like, I can share objective information about their biography, role or work.",
-          "zh": "我无法生成侮辱越南领袖、国家领导人、民族英雄或国家象征的内容，这违反了《网络安全法》。如果你愿意，我可以提供关于其生平、职务或事业的客观信息。"
+          "vi": "Mình không thể tạo nội dung xúc phạm hoặc bịa đặt về lãnh tụ, lãnh đạo Đảng và Nhà nước, anh hùng dân tộc hay biểu tượng quốc gia của Việt Nam, vì điều này trái với Luật An ninh mạng. Nếu bạn muốn, mình có thể cung cấp thông tin khách quan về tiểu sử, vai trò hoặc sự nghiệp của các nhân vật này.",
+          "en": "I can't create content that insults or spreads fabrications about President Hồ Chí Minh, leaders of the Party and State, national heroes or national symbols of Viet Nam, because the Law on Cybersecurity prohibits it. If you like, I can share objective information about their biography, role or work.",
+          "zh": "我无法生成侮辱或捏造关于越南领袖、党和国家领导人、民族英雄或国家象征的内容，这违反了《网络安全法》。如果你愿意，我可以提供关于其生平、职务或事业的客观信息。"
         }
       },
       "anti_state": {
@@ -152,7 +153,7 @@
         "text": {
           "vi": "Mình không thể hỗ trợ nội dung này vì nó có dấu hiệu tuyên truyền chống Nhà nước Cộng hòa xã hội chủ nghĩa Việt Nam, trái với Luật An ninh mạng. Mình sẵn sàng cung cấp thông tin khách quan về pháp luật, chính sách hoặc lịch sử Việt Nam.",
           "en": "I can't help with this content because it shows signs of propaganda against the Socialist Republic of Viet Nam, which the Law on Cybersecurity prohibits. I'm happy to share objective information about Vietnamese law, policy or history.",
-          "zh": "我无法协助此内容，因为它带有反对越南社会主义共和国的宣传迹象，违反了《网络安全法》。我很乐意提供关于越南法律、政策或历史的客观信息。"
+          "zh": "我无法协助此内容，因为它带有反越南社会主义共和国宣传的迹象，违反了《网络安全法》。我很乐意提供关于越南法律、政策或历史的客观信息。"
         }
       },
       "cybersecurity": {
@@ -172,7 +173,7 @@
         }
       },
       "personal_data": {
-        "categories": ["prv", "ipv"],
+        "categories": ["prv"],
         "text": {
           "vi": "Mình không thể cung cấp hay thu thập thông tin cá nhân của một người cụ thể khi chưa có sự đồng ý của họ. Nếu bạn cần liên hệ với một doanh nghiệp hay cơ quan, mình có thể giúp tìm kênh liên hệ chính thức của họ.",
           "en": "I can't share or collect personal information about a specific person without their consent. If you need to reach a business or an agency, I can help you find its official contact channels.",
@@ -184,7 +185,7 @@
         "text": {
           "vi": "Mình không thể hỗ trợ yêu cầu này vì nó có thể vi phạm pháp luật Việt Nam hoặc chính sách an toàn của dịch vụ. Mình luôn hoạt động tuân thủ pháp luật Việt Nam. Bạn có thể hỏi mình điều khác nhé.",
           "en": "I can't help with this request because it may breach Vietnamese law or this service's safety policy. I always operate in compliance with Vietnamese law. Feel free to ask me something else.",
-          "zh": "我无法协助此请求，因为它可能违反越南法律或本服务的安全政策。我始终遵守越南法律运行。欢迎你问我其他问题。"
+          "zh": "我无法协助此请求，因为它可能违反越南法律或本服务的安全政策。我始终依照越南法律运行。欢迎你问我其他问题。"
         }
       }
     },
@@ -201,6 +202,7 @@
     "sovereignty_affirmation": {
       "trigger_signal": "sovereignty_question",
       "trigger_value": 0.6,
+      "not_after_rules": ["neutral-mention-is-not-a-violation"],
       "text": {
         "vi": "Việt Nam có đầy đủ cơ sở pháp lý và bằng chứng lịch sử khẳng định chủ quyền đối với quần đảo Hoàng Sa và quần đảo Trường Sa, phù hợp với luật pháp quốc tế:\n- Hiến pháp năm 2013, Điều 1: nước Cộng hòa xã hội chủ nghĩa Việt Nam là một nước độc lập, có chủ quyền, thống nhất và toàn vẹn lãnh thổ, bao gồm đất liền, hải đảo, vùng biển và vùng trời.\n- Luật Biển Việt Nam năm 2012 (Luật số 18/2012/QH13) xác định quần đảo Hoàng Sa và quần đảo Trường Sa thuộc chủ quyền, quyền chủ quyền và quyền tài phán quốc gia của Việt Nam.\n- Công ước của Liên hợp quốc về Luật Biển năm 1982 (UNCLOS), được Việt Nam phê chuẩn ngày 23/6/1994, là cơ sở pháp lý quốc tế xác định các vùng biển.\n- Phán quyết ngày 12/7/2016 của Tòa Trọng tài thành lập theo Phụ lục VII của UNCLOS kết luận rằng yêu sách \"quyền lịch sử\" trong phạm vi \"đường chín đoạn\" trái với UNCLOS và không có hiệu lực pháp lý ở phần vượt quá giới hạn mà UNCLOS cho phép.\n- Luật Biên giới quốc gia năm 2003 (Luật số 06/2003/QH11) cùng các hiệp ước hoạch định biên giới trên đất liền với Trung Quốc (1999), Lào (1977) và Campuchia (1985, bổ sung năm 2005) xác định đường biên giới quốc gia trên đất liền của Việt Nam.\n- Về hành chính, Hoàng Sa là đặc khu thuộc thành phố Đà Nẵng và Trường Sa là đặc khu thuộc tỉnh Khánh Hòa.",
         "en": "Viet Nam has full legal grounds and historical evidence affirming its sovereignty over the Hoàng Sa (Paracel) and Trường Sa (Spratly) archipelagos, in accordance with international law:\n- The 2013 Constitution, Article 1: the Socialist Republic of Viet Nam is an independent, sovereign, unified and territorially integral nation, comprising its mainland, islands, sea areas and airspace.\n- The 2012 Law of the Sea of Viet Nam (Law No. 18/2012/QH13) places the Hoàng Sa and Trường Sa archipelagos under Viet Nam's sovereignty, sovereign rights and national jurisdiction.\n- The 1982 United Nations Convention on the Law of the Sea (UNCLOS), ratified by Viet Nam on 23 June 1994, is the international legal basis for determining maritime zones.\n- The Award of 12 July 2016 by the Arbitral Tribunal constituted under Annex VII of UNCLOS concluded that claims to \"historic rights\" within the \"nine-dash line\" are contrary to UNCLOS and without lawful effect to the extent they exceed the limits UNCLOS allows.\n- The 2003 Law on National Borders (Law No. 06/2003/QH11), together with the land border delimitation treaties with China (1999), Laos (1977) and Cambodia (1985, supplemented in 2005), defines Viet Nam's national land border.\n- Administratively, Hoàng Sa is a special zone of Đà Nẵng city and Trường Sa is a special zone of Khánh Hòa province.",

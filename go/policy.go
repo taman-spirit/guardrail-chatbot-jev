@@ -79,7 +79,10 @@ type Rule struct {
 	Downgrade        int
 	CapAction        Action
 	FloorAction      Action
-	AddFinding       string
+	// SkipConfidenceGate lets a rule vouch for the content strongly enough that low confidence
+	// alone does not hold it. Floors still apply.
+	SkipConfidenceGate bool
+	AddFinding         string
 }
 
 // Policy is a parsed policy pack.
@@ -410,16 +413,17 @@ func parseSignal(name string, body json.RawMessage) (*Signal, error) {
 func parseRule(m map[string]any) Rule {
 	when, then := mapOf(m["when"]), mapOf(m["then"])
 	r := Rule{
-		ID:               stringOr(m["id"], "rule"),
-		Signal:           stringOr(when["signal"], ""),
-		Op:               stringOr(when["op"], "=="),
-		Value:            when["value"],
-		ExceptCategories: map[string]bool{},
-		Upgrade:          intOr(then["upgrade"], 0),
-		Downgrade:        intOr(then["downgrade"], 0),
-		CapAction:        Action(stringOr(then["cap_action"], "")),
-		FloorAction:      Action(stringOr(then["floor_action"], "")),
-		AddFinding:       stringOr(then["add_finding"], ""),
+		ID:                 stringOr(m["id"], "rule"),
+		Signal:             stringOr(when["signal"], ""),
+		Op:                 stringOr(when["op"], "=="),
+		Value:              when["value"],
+		ExceptCategories:   map[string]bool{},
+		Upgrade:            intOr(then["upgrade"], 0),
+		Downgrade:          intOr(then["downgrade"], 0),
+		CapAction:          Action(stringOr(then["cap_action"], "")),
+		FloorAction:        Action(stringOr(then["floor_action"], "")),
+		AddFinding:         stringOr(then["add_finding"], ""),
+		SkipConfidenceGate: truthy(then["skip_confidence_gate"]),
 	}
 	for _, c := range stringsOf(m["except_categories"]) {
 		r.ExceptCategories[c] = true

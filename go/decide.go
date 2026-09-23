@@ -2,6 +2,7 @@ package guardrail
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 )
 
@@ -52,9 +53,20 @@ func Decide(p *Policy, surface Surface, answers Answers, opts DecideOptions) Ver
 	}
 
 	confidence := overallConfidence(answers, findings, confidences)
-	action, escalated := confidenceGate(p, action, confidence, findings, probabilities, surface)
-	if escalated {
-		applied = append(applied, "confidence-gate")
+	// A rule can vouch for the content strongly enough that low confidence is not a reason to hold
+	// it, such as a pack's "this only mentions a place" rule. Floors still apply.
+	gateOff := false
+	for _, rule := range p.Rules {
+		if rule.SkipConfidenceGate && slices.Contains(applied, rule.ID) {
+			gateOff = true
+		}
+	}
+	if !gateOff {
+		var escalated bool
+		action, escalated = confidenceGate(p, action, confidence, findings, probabilities, surface)
+		if escalated {
+			applied = append(applied, "confidence-gate")
+		}
 	}
 
 	sort.SliceStable(findings, func(i, j int) bool {
@@ -386,8 +398,13 @@ func confidenceGate(p *Policy, action Action, confidence float64, findings []Fin
 // route says how the deployment should handle the content, given the decision and the hazard.
 // The action says whether the content goes out; the route says what to do about it.
 func route(p *Policy, findings []Finding, action Action) Route {
+	// Only a finding that still counts sets the handling: one a rule capped to allow is a record,
+	// not a reason to redact.
 	var hazardRoute Route
 	for _, f := range findings {
+		if Rank(f.Action) < Rank(Flag) {
+			continue
+		}
 		if cat, ok := p.Categories[f.Category]; ok && categoryRoutes[cat.Route] {
 			hazardRoute = cat.Route
 			break

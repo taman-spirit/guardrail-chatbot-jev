@@ -35,7 +35,7 @@ Policy chia nội dung vi phạm thành các nhóm, mỗi nhóm có câu trả l
 
 | Nhóm | Căn cứ | Guardrail chặn | Guardrail **không** chặn |
 | --- | --- | --- | --- |
-| `vsv` Chủ quyền lãnh thổ | Luật An ninh mạng | Nội dung phủ nhận, xuyên tạc chủ quyền lãnh thổ của Việt Nam | Thời tiết, du lịch, lịch sử, tin tức, câu hỏi về pháp lý |
+| `vsv` Chủ quyền lãnh thổ | Luật An ninh mạng | Nội dung phủ nhận, xuyên tạc chủ quyền lãnh thổ của Việt Nam | Thời tiết, du lịch, lịch sử, tin tức, câu hỏi về địa vị pháp lý |
 | `vas` Chống phá Nhà nước | Luật An ninh mạng | Tuyên truyền chống Nhà nước, kích động lật đổ, xuyên tạc lịch sử | Câu hỏi về thể chế, pháp luật, chính sách; góp ý hợp pháp |
 | `vld` Lãnh tụ, lãnh đạo, biểu tượng quốc gia | Luật An ninh mạng | Xúc phạm, bịa đặt về lãnh tụ, lãnh đạo, anh hùng dân tộc, Quốc kỳ, Quốc huy, Quốc ca | Tiểu sử, chức danh, trích dẫn, tin tức |
 | `vcs` Tin giả, gây rối | Luật An ninh mạng | Tin giả gây hoang mang, kích động gây rối, tấn công hệ thống thông tin | Hỏi kiểm chứng tin đồn, báo cáo tin giả, kiến thức phòng thủ |
@@ -65,7 +65,7 @@ def handle(message: str) -> str:
     return responder.compose(reply, [verdict_in, verdict_out], language=lang)
 ```
 
-Go:
+Go (có trong bản phát hành `go-vietnam-compliance-v1`, module `v1.1.0` trở lên):
 
 ```go
 policy, _ := guardrail.BundledPolicy("vietnam-compliance-v1")
@@ -101,10 +101,11 @@ return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
 Chặn nhầm cũng là lỗi. Policy có hai cơ chế giảm chặn nhầm:
 
 1. **Nhắc đến một cách trung tính.** Khi nội dung chỉ nhắc đến một địa danh, một người hay một tổ
-   chức (thời tiết, du lịch, chức danh, tin tức), kết quả bị giới hạn ở mức ghi nhận và không bao
-   giờ bị chặn.
+   chức (thời tiết, du lịch, chức danh, tin tức), kết quả bị giới hạn ở mức ghi nhận: không bị chặn,
+   không bị giữ lại chỉ vì mô hình kém chắc chắn, và không bị gắn đoạn khẳng định chủ quyền. Chỉ khi
+   cả cuộc hội thoại có dấu hiệu leo thang thì lượt đó mới bị giữ lại để xem xét.
 2. **Tổ chức không phải cá nhân.** Thông tin liên hệ công khai của doanh nghiệp, cơ quan không được
-   coi là dữ liệu cá nhân, và không bị che.
+   coi là dữ liệu cá nhân, không bị che và không bị giữ lại, kể cả khi kiểm tra cả cuộc hội thoại.
 
 Ví dụ phải được cho qua:
 

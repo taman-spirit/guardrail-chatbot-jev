@@ -140,10 +140,8 @@ fmt.Println(verdict.Action) // block
 The Go module is documented in [`go/README.md`](go/README.md), including how its API maps onto the
 Python one.
 
-For AI services in Viet Nam, `vietnam-compliance-v1` covers the content requirements of the **Law
-on Artificial Intelligence** (Luật Trí tuệ nhân tạo) and the **Law on Cybersecurity** (Luật An ninh
-mạng). Guide: [Tiếng Việt](docs/vietnam-compliance.vi.md) · [English](docs/vietnam-compliance.md) ·
-[中文](docs/vietnam-compliance.zh.md).
+The Go module also embeds `vietnam-compliance-v1`; see [AI compliance in Viet Nam](#ai-compliance-in-viet-nam)
+and the [Go section on it](go/README.md#viet-nam).
 
 ### 4. Wire it into a turn
 
