@@ -310,7 +310,7 @@ in Vietnamese, English and Chinese.
 from guardrail_chatbot_jev import Guard, Responder, detect_language
 
 guard = Guard("vietnam-compliance-v1")
-responder = Responder(guard.policy, crisis_line=VERIFIED_LINE)
+responder = Responder(guard.policy)   # self-harm support line defaults to 115
 
 verdict_in = guard.check_input(message)
 if held := responder.blocking_response([verdict_in], language=detect_language(message)):
@@ -324,6 +324,9 @@ The replies are selected, never written by the model. The pack's source is
 [`policies/overlays/vietnam-compliance.json`](policies/overlays/vietnam-compliance.json);
 `scripts/build-packs.py` layers it on `standard-v1`, and
 [`examples/cases-vietnam.jsonl`](examples/cases-vietnam.jsonl) is its labelled set.
+
+The step-by-step compliance guide: [Tiếng Việt](docs/vietnam-compliance.vi.md) ·
+[English](docs/vietnam-compliance.md) · [中文](docs/vietnam-compliance.zh.md).
 
 ---
 

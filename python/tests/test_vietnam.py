@@ -245,15 +245,18 @@ def test_self_harm_is_met_with_empathy_not_the_law(vn: Policy, responder: Respon
     assert verdict.route == "crisis_support"
     text = responder.blocking_response([verdict], language="vi")
     assert text is not None
-    assert "không phải đối mặt với điều này một mình" in text and "115" in text
+    assert "không phải đối mặt với điều này một mình" in text
+    assert "hãy gọi 115" in text, "115 is the default line"
     assert "pháp luật" not in text and "Luật" not in text
-    assert "{crisis_line}" not in text and "{number}" not in text
+    assert "{crisis_line}" not in text
 
 
-def test_a_verified_crisis_line_is_inserted(vn: Policy) -> None:
+@pytest.mark.parametrize("lang", ["vi", "en", "zh"])
+def test_a_verified_crisis_line_replaces_the_default(vn: Policy, lang: str) -> None:
     verdict = decide(vn, "input", vn_answers(s_ssh=noul(0.8)))
-    text = Responder(vn, crisis_line=CRISIS).blocking_response([verdict], language="en")
+    text = Responder(vn, crisis_line=CRISIS).blocking_response([verdict], language=lang)
     assert text is not None and CRISIS in text
+    assert "115" not in text, "one number to call, not two"
 
 
 def test_an_outage_says_so_instead_of_accusing_the_user(vn: Policy, responder: Responder) -> None:

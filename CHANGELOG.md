@@ -13,6 +13,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `Responder`, which picks the pack's prewritten reply for a verdict in Vietnamese, English or
   Chinese instead of letting the model write it.
 - `scripts/build-packs.py`, which builds derived packs from overlays in `policies/overlays/`.
+- A step-by-step compliance guide for AI services in Viet Nam, in Vietnamese, English and Chinese:
+  `docs/vietnam-compliance*.md`.
 
 ## [1.0.0]
 

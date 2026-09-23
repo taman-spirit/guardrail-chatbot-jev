@@ -59,9 +59,9 @@ class Responder:
 
     Args:
         policy: A pack with a ``responses`` section, such as ``vietnam-compliance-v1``.
-        crisis_line: A support number your team has verified for the country you serve. Without
-            one the self-harm reply points to emergency services only; a number that has changed
-            or was never right is worse than none.
+        crisis_line: The number the self-harm reply asks the user to call. Defaults to the pack's
+            ``crisis_line_default`` (115 in the Viet Nam pack). Replace it only with a line your
+            team has verified: a number that has changed or was never right is worse than none.
     """
 
     def __init__(self, policy: Policy, *, crisis_line: str | None = None) -> None:
@@ -71,7 +71,7 @@ class Responder:
         self.spec = spec
         self.languages: tuple[str, ...] = tuple(spec.get("languages") or ("vi",))
         self.default_language: str = str(spec.get("default_language") or self.languages[0])
-        self.crisis_line = crisis_line
+        self.crisis_line = crisis_line or str(spec.get("crisis_line_default") or "")
         self._groups: dict[str, Mapping[str, Any]] = dict(spec.get("groups") or {})
         self._order: list[str] = list(spec.get("order") or self._groups)
         self._by_category: dict[str, str] = {}
@@ -157,13 +157,7 @@ class Responder:
 
     def _group_text(self, group: str, language: str | None) -> str:
         spec = self._groups[group]
-        text = self._text(spec.get("text") or {}, language)
-        if "{crisis_line}" in text:
-            line = ""
-            if self.crisis_line:
-                line = self._text(spec.get("crisis_line") or {}, language).format(number=self.crisis_line)
-            text = text.replace("{crisis_line}", line)
-        return text
+        return self._text(spec.get("text") or {}, language).replace("{crisis_line}", self.crisis_line)
 
     def _text(self, texts: Mapping[str, str], language: str | None) -> str:
         lang = language if language in texts else self.default_language
@@ -185,6 +179,9 @@ def _check(responder: Responder) -> None:
         for lang in responder.languages:
             if not (spec.get(key) or {}).get(lang):
                 missing.append(f"{key}.{lang}")
+    for name, group in responder._groups.items():
+        if any("{crisis_line}" in text for text in (group.get("text") or {}).values()) and not responder.crisis_line:
+            missing.append(f"{name} needs a crisis line: set crisis_line_default or pass crisis_line")
     for lang in responder.languages:
         if responder._affirmation and not (responder._affirmation.get("text") or {}).get(lang):
             missing.append(f"sovereignty_affirmation.{lang}")

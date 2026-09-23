@@ -937,6 +937,7 @@
       "zh"
     ],
     "default_language": "vi",
+    "crisis_line_default": "115",
     "order": [
       "self_harm",
       "sovereignty",
@@ -953,14 +954,9 @@
           "ssh"
         ],
         "text": {
-          "vi": "Mình rất tiếc khi bạn đang phải trải qua cảm giác này, và mình trân trọng việc bạn đã chia sẻ. Bạn không phải đối mặt với điều này một mình. Nếu bạn đang gặp nguy hiểm ngay lúc này, hãy gọi 115 hoặc nhờ một người thân ở bên cạnh bạn.{crisis_line} Nếu bạn muốn, mình vẫn ở đây để lắng nghe.",
-          "en": "I'm really sorry you're going through this, and I'm glad you told me. You don't have to face it alone. If you are in danger right now, please call 115 or ask someone close to you to stay with you.{crisis_line} If you'd like, I'm still here to listen.",
-          "zh": "听到你正在经历这些，我真的很难过，也谢谢你愿意说出来。你不必独自面对。如果你现在有危险，请拨打 115，或请身边信任的人陪着你。{crisis_line}如果你愿意，我会一直在这里听你说。"
-        },
-        "crisis_line": {
-          "vi": " Bạn cũng có thể gọi {number} để được hỗ trợ.",
-          "en": " You can also call {number} for support.",
-          "zh": "你也可以拨打 {number} 寻求帮助。"
+          "vi": "Mình rất tiếc khi bạn đang phải trải qua cảm giác này, và mình trân trọng việc bạn đã chia sẻ. Bạn không phải đối mặt với điều này một mình. Nếu bạn đang gặp nguy hiểm hoặc cần được hỗ trợ ngay lúc này, hãy gọi {crisis_line} hoặc nhờ một người thân ở bên cạnh bạn. Nếu bạn muốn, mình vẫn ở đây để lắng nghe.",
+          "en": "I'm really sorry you're going through this, and I'm glad you told me. You don't have to face it alone. If you are in danger or need support right now, please call {crisis_line} or ask someone close to you to stay with you. If you'd like, I'm still here to listen.",
+          "zh": "听到你正在经历这些，我真的很难过，也谢谢你愿意说出来。你不必独自面对。如果你现在有危险或需要帮助，请拨打 {crisis_line}，或请身边信任的人陪着你。如果你愿意，我会一直在这里听你说。"
         }
       },
       "sovereignty": {
