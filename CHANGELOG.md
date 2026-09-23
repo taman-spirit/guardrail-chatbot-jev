@@ -16,7 +16,6 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - The licence is now CC BY-NC 4.0 (Creative Commons Attribution-NonCommercial 4.0 International).
-  Releases published before this change remain under MIT.
 
 ## [1.0.0]
 
@@ -51,4 +50,3 @@ First public release.
   input surface a degraded verdict's action is `allow` and reporting that as success would tell a
   pipeline the content passed a check that never ran.
 - Documentation in English, Vietnamese, French and Japanese.
-- MIT licensed.
