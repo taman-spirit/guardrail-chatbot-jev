@@ -548,4 +548,4 @@ example, công cụ tuning offline và phần đóng gói.
 
 [CC BY-NC 4.0](LICENSE): Creative Commons Ghi công - Phi thương mại 4.0 Quốc tế. Bạn được dùng,
 chia sẻ và chỉnh sửa cho mục đích phi thương mại, kèm ghi công tác giả. Dùng cho mục đích thương mại
-cần được chủ sở hữu bản quyền cho phép riêng. Các bản phát hành trước thay đổi này (`python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1`) vẫn theo giấy phép MIT.
+cần được chủ sở hữu bản quyền cho phép riêng.

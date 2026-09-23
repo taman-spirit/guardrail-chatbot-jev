@@ -41,4 +41,3 @@ Guard().preview("input", {"user_message": "..."})             # the request, uns
 ## License
 
 CC BY-NC 4.0 (Creative Commons Attribution-NonCommercial 4.0 International). See `../LICENSE`.
-Releases published before this change remain under MIT.
