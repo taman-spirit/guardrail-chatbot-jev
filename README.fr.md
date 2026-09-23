@@ -57,7 +57,7 @@ go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.1
 
 Les versions Go et Viet Nam sont construites depuis leurs propres branches (`go-sdk`,
 `guardrail-vietnam-compliance`, `go-vietnam-compliance`), pas encore fusionnées dans `main`. Les
-versions antérieures `python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` sont remplacées par celles-ci et restent sous licence MIT.
+versions antérieures `python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` sont remplacées par celles-ci.
 [Toutes les versions](https://github.com/taman-spirit/guardrail-chatbot-jev/releases).
 
 ## Conformité de l'IA au Viet Nam

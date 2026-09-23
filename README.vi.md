@@ -56,7 +56,7 @@ go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.1
 
 Các bản Go và Việt Nam được build từ branch riêng (`go-sdk`, `guardrail-vietnam-compliance`,
 `go-vietnam-compliance`) và chưa được merge vào `main`. Các bản trước đó `python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` đã được thay
-thế bởi các bản trên và vẫn theo giấy phép MIT. [Tất cả bản phát hành](https://github.com/taman-spirit/guardrail-chatbot-jev/releases).
+thế bởi các bản trên. [Tất cả bản phát hành](https://github.com/taman-spirit/guardrail-chatbot-jev/releases).
 
 ## Tuân thủ AI tại Việt Nam
 
