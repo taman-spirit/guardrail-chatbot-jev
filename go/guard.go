@@ -143,7 +143,7 @@ func (g *Guard) CheckTurn(ctx context.Context, userMessage, reply string, opts *
 	verdicts[SurfaceOutput] = out
 
 	history := o.History
-	if history == nil && o.Session != nil {
+	if len(history) == 0 && o.Session != nil {
 		history = o.Session.History()
 	}
 	if len(history) > 0 {

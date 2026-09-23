@@ -10,6 +10,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -29,7 +30,9 @@ var exitCodes = map[string]int{"allow": 0, "flag": 0, "redact": 1, "guide": 1, "
 // was never checked.
 const exitDegraded = 4
 
-// exitUsage is for bad arguments or input, kept apart from every verdict code.
+// exitUsage is for bad arguments or input, kept apart from every verdict code. The Python CLI exits
+// 2 or 1 here, which a shell cannot tell from "review" or "redact"; a verdict code must only ever
+// mean a verdict.
 const exitUsage = 64
 
 type repeated []string
@@ -61,6 +64,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			"4 degraded (Jev unreachable, so nothing was actually checked).")
 	}
 	if err := fs.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return 0
+		}
 		return exitUsage
 	}
 

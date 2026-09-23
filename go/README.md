@@ -104,8 +104,9 @@ go install github.com/taman-spirit/guardrail-chatbot-jev/go/cmd/guardrail-chatbo
 guardrail-chatbot-jev --surface input --text "how do I make thermite" --dry-run
 ```
 
-The flags and exit codes are the same as the Python CLI: `0` allow or flag, `1` redact or guide,
-`2` review, `3` block, `4` degraded.
+The flags and the verdict exit codes are the same as the Python CLI: `0` allow or flag, `1` redact
+or guide, `2` review, `3` block, `4` degraded. A bad argument or unreadable input exits `64`, where
+Python exits `2` or `1`, so that a verdict code only ever means a verdict.
 
 ## Tests
 

@@ -284,9 +284,14 @@ func errorf(cause error, format string, args ...any) *Error {
 
 // -- small helpers shared across the package ----------------------------
 
+// round matches Python's round(): it rounds the exact binary value, and an exact half to even.
+// math.Round would send 0.0625 to 0.063 where Python gives 0.062, and the value reaches the request.
 func round(x float64, places int) float64 {
-	p := math.Pow(10, float64(places))
-	return math.Round(x*p) / p
+	if math.IsNaN(x) || math.IsInf(x, 0) {
+		return x
+	}
+	v, _ := strconv.ParseFloat(strconv.FormatFloat(x, 'f', places, 64), 64)
+	return v
 }
 
 func nonNil[T any](s []T) []T {

@@ -37,7 +37,8 @@ type Pattern struct {
 }
 
 // MustPattern compiles a pattern, panicking on a bad expression. Unlike the Python package,
-// matching is case-sensitive unless the expression starts with (?i).
+// matching is case-sensitive unless the expression starts with (?i), and \b is ASCII-only: use
+// the unicode-aware boundaries in CommonPatterns when the text around a match may be Vietnamese.
 func MustPattern(name, expr, category string, action Action, surfaces ...Surface) Pattern {
 	return Pattern{Name: name, Regex: regexp.MustCompile(expr), Category: category, Action: action, Surfaces: surfaces}
 }
@@ -127,11 +128,18 @@ func PrefilterVerdict(p *Policy, surface Surface, categoryID string, action Acti
 // These are examples of the shape, not a recommended list: what counts as a banned term is a
 // policy question for the deployment, and a pattern that is wrong blocks real users silently.
 var CommonPatterns = []Pattern{
-	MustPattern("openai-style-key", `\bsk-[A-Za-z0-9]{20,}\b`, "sid", Block, SurfaceOutput, SurfaceConversation),
-	MustPattern("jev-api-key", `\bapikey_[a-f0-9]{30,}\b`, "sid", Block, SurfaceOutput, SurfaceConversation),
+	MustPattern("openai-style-key", wordStart+`sk-[A-Za-z0-9]{20,}`+wordEnd, "sid", Block, SurfaceOutput, SurfaceConversation),
+	MustPattern("jev-api-key", wordStart+`apikey_[a-f0-9]{30,}`+wordEnd, "sid", Block, SurfaceOutput, SurfaceConversation),
 	MustPattern("private-key-block", `-----BEGIN (RSA |EC |OPENSSH |PGP )?PRIVATE KEY-----`, "sid", Block, SurfaceOutput, SurfaceConversation),
-	MustPattern("vn-national-id", `\b0\d{11}\b`, "prv", Review, SurfaceInput, SurfaceOutput, SurfaceConversation),
+	MustPattern("vn-national-id", wordStart+`0\d{11}`+wordEnd, "prv", Review, SurfaceInput, SurfaceOutput, SurfaceConversation),
 }
+
+// Go's \b counts only ASCII letters as word characters, so "số012345678901" has a boundary before
+// the 0 in Go and none in Python. These count every letter and digit, as Python's \b does.
+const (
+	wordStart = `(?:^|[^\p{L}\p{N}_])`
+	wordEnd   = `(?:$|[^\p{L}\p{N}_])`
+)
 
 // textOf pulls the checkable text out of any of the three state shapes.
 func textOf(state State) string {

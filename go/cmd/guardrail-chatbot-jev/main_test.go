@@ -77,3 +77,9 @@ func TestTheExitCodesAreOrderedBySeverity(t *testing.T) {
 		}
 	}
 }
+
+func TestHelpExitsZero(t *testing.T) {
+	if code, _ := cli(t, "", "--help"); code != 0 {
+		t.Fatalf("code=%d", code)
+	}
+}

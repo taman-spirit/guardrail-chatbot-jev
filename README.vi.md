@@ -36,6 +36,42 @@ quyết định làm gì. Thư viện chạy trên **Python và TypeScript**, c�
 nên hai nửa hệ thống của bạn không thể lệch nhau. Cả hai package đều không phụ thuộc thư viện bên
 thứ ba nào.
 
+## Các bản phát hành
+
+| Bản phát hành | Tag | Nội dung |
+| --- | --- | --- |
+| [Python SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.0) | `python/v1.0.0` | Gói Python: ba lượt kiểm tra, cache, prefilter, session, streaming, hiệu chỉnh offline và CLI |
+| [Go SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.0.0) | `go/v1.0.0` | Bản Go của gói Python, đọc cùng policy và cho cùng kết quả |
+| [Python: policy tuân thủ Việt Nam v1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1) | `python-vietnam-compliance-v1` | Policy `vietnam-compliance-v1`, kèm câu trả lời viết sẵn bằng tiếng Việt, tiếng Anh và tiếng Trung |
+| [Go: policy tuân thủ Việt Nam v1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1) | `go-vietnam-compliance-v1` | Cùng policy và câu trả lời đó cho Go, phiên bản module `v1.1.0` |
+
+Release note của từng bản ghi rõ nội dung và cách cài đặt. Theo đúng thứ tự trên:
+
+```bash
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.0.0#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.0.0
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.0
+```
+
+Các bản Go và Việt Nam được build từ branch riêng (`go-sdk`, `guardrail-vietnam-compliance`,
+`go-vietnam-compliance`) và chưa được merge vào `main`. [Tất cả bản phát hành](https://github.com/taman-spirit/guardrail-chatbot-jev/releases).
+
+## Tuân thủ AI tại Việt Nam
+
+Với dịch vụ AI tại Việt Nam, policy `vietnam-compliance-v1` đáp ứng các yêu cầu về nội dung của hai
+luật:
+
+- **Luật Trí tuệ nhân tạo**
+- **Luật An ninh mạng**
+
+Policy bổ sung các quy tắc riêng lên bộ phân loại chung, trả lời mỗi nhóm vi phạm bằng một câu viết
+sẵn bằng tiếng Việt, tiếng Anh hoặc tiếng Trung thay vì để mô hình tự viết, và được thiết kế để không
+chặn nhầm câu hỏi bình thường. Hãy hiệu chỉnh trên dữ liệu thật của bạn trước khi vận hành.
+
+Hướng dẫn tuân thủ từng bước gồm phạm vi, minh bạch, nội dung bị cấm, tích hợp bằng Python và Go,
+hiệu chỉnh, con người giám sát và lưu vết: **[Tiếng Việt](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.vi.md) · [English](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.md) · [中文](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.zh.md)**.
+
 ## Cách hoạt động, gói trong một hình
 
 ```

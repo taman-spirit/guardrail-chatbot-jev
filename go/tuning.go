@@ -202,6 +202,10 @@ var BandNames = []string{"block", "review", "flag"}
 // Keys are "category.surface.band", for example "prv.output.review". Use "default" as the
 // surface to change the fallback band. The bands are kept ordered, so an override cannot
 // produce a policy that will not load.
+//
+// Go maps have no order, so the changes apply in sorted key order. Python applies them in the
+// order the dict was built, and because each change clamps the bands, two changes to one
+// category can land differently. Make one call per category when that matters.
 func Override(p *Policy, changes map[string]float64) (*Policy, error) {
 	var categories map[string]map[string]any
 	if err := json.Unmarshal(p.raw["categories"], &categories); err != nil {

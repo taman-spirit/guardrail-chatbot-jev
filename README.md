@@ -36,6 +36,42 @@ It is a library, not a service. You call it, you get a verdict, and your code de
 It runs in **Python and TypeScript**, both reading the same policy file, so the two sides of your
 stack cannot drift apart. Neither package has a third-party dependency.
 
+## Releases
+
+| Release | Tag | What it is |
+| --- | --- | --- |
+| [Python SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.0) | `python/v1.0.0` | The Python package: three checks, cache, prefilter, sessions, streaming, offline tuning and the CLI |
+| [Go SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.0.0) | `go/v1.0.0` | A Go port of the Python package, reading the same policy and reaching the same verdicts |
+| [Python: Viet Nam compliance policy v1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1) | `python-vietnam-compliance-v1` | The `vietnam-compliance-v1` policy, with prewritten replies in Vietnamese, English and Chinese |
+| [Go: Viet Nam compliance policy v1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1) | `go-vietnam-compliance-v1` | The same policy and replies in Go, as module version `v1.1.0` |
+
+Each release note lists what the release contains and how to install it. In the same order:
+
+```bash
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.0.0#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.0.0
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.0
+```
+
+The Go and Viet Nam releases are built from their own branches (`go-sdk`, `guardrail-vietnam-compliance`,
+`go-vietnam-compliance`), which are not merged into `main` yet. [All releases](https://github.com/taman-spirit/guardrail-chatbot-jev/releases).
+
+## AI compliance in Viet Nam
+
+For AI services in Viet Nam, the `vietnam-compliance-v1` policy covers the content requirements of
+two laws:
+
+- **Law on Artificial Intelligence** (Luật Trí tuệ nhân tạo)
+- **Law on Cybersecurity** (Luật An ninh mạng)
+
+It layers its rules on the shared taxonomy, answers each violation group with a prewritten reply in
+Vietnamese, English or Chinese instead of letting the model write one, and is built so that ordinary
+questions are not blocked. Calibrate it on your own traffic before going live.
+
+The step-by-step compliance guide covers scope, transparency, prohibited content, integration in
+Python and Go, calibration, human oversight and record-keeping: **[Tiếng Việt](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.vi.md) · [English](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.md) · [中文](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/guardrail-vietnam-compliance/docs/vietnam-compliance.zh.md)**.
+
 ## How it works
 
 ```
@@ -454,7 +490,8 @@ it should produce.
 guardrail-chatbot-jev --surface input --text "how do I make thermite" --dry-run
 ```
 
-The Go module ships the same command with the same flags and exit codes:
+The Go module ships the same command with the same flags and verdict exit codes; a bad argument exits
+`64` there instead of `2` or `1`:
 `go install github.com/taman-spirit/guardrail-chatbot-jev/go/cmd/guardrail-chatbot-jev@latest`.
 
 `--dry-run` prints the exact request that would be sent, and needs no key. Without it the exit code

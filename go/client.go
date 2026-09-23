@@ -175,7 +175,7 @@ func (t *HTTPTransport) attempt(ctx context.Context, body []byte, timeout time.D
 		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 400))
 		retryAfter := time.Duration(-1)
 		if secs, perr := strconv.ParseFloat(resp.Header.Get("Retry-After"), 64); perr == nil && secs >= 0 {
-			retryAfter = time.Duration(secs * float64(time.Second))
+			retryAfter = time.Duration(min(secs, t.BackoffMax.Seconds()) * float64(time.Second))
 		}
 		return Reply{}, resp.StatusCode, retryAfter,
 			&Error{Msg: fmt.Sprintf("Jev API returned %d: %q", resp.StatusCode, snippet)}
