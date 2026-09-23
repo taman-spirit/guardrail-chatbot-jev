@@ -40,7 +40,7 @@ thứ ba nào.
 
 | Bản phát hành | Tag | Nội dung | Giấy phép |
 | --- | --- | --- | --- |
-| [Python SDK 1.0.0](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.0) | `python/v1.0.0` | Gói Python: ba lượt kiểm tra, cache, prefilter, session, streaming, hiệu chỉnh offline và CLI | MIT |
+| [Python SDK 1.0.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.1) | `python/v1.0.1` | Gói Python: ba lượt kiểm tra, cache, prefilter, session, streaming, hiệu chỉnh offline và CLI | CC BY-NC 4.0 |
 | [Go SDK 1.0.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.0.1) | `go/v1.0.1` | Bản Go của gói Python, đọc cùng policy và cho cùng kết quả | CC BY-NC 4.0 |
 | [Python: policy tuân thủ Việt Nam v1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.1) | `python-vietnam-compliance-v1.1` | Policy `vietnam-compliance-v1`, kèm câu trả lời viết sẵn bằng tiếng Việt, tiếng Anh và tiếng Trung | CC BY-NC 4.0 |
 | [Go: policy tuân thủ Việt Nam v1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.1) | `go-vietnam-compliance-v1.1` | Cùng policy và câu trả lời đó cho Go, phiên bản module `v1.1.1` | CC BY-NC 4.0 |
@@ -48,14 +48,14 @@ thứ ba nào.
 Release note của từng bản ghi rõ nội dung và cách cài đặt. Theo đúng thứ tự trên:
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.0.0#subdirectory=python"
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.0.1#subdirectory=python"
 go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.0.1
 pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.1#subdirectory=python"
 go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.1
 ```
 
 Các bản Go và Việt Nam được build từ branch riêng (`go-sdk`, `guardrail-vietnam-compliance`,
-`go-vietnam-compliance`) và chưa được merge vào `main`. Các bản trước đó `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` đã được thay
+`go-vietnam-compliance`) và chưa được merge vào `main`. Các bản trước đó `python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` đã được thay
 thế bởi các bản trên và vẫn theo giấy phép MIT. [Tất cả bản phát hành](https://github.com/taman-spirit/guardrail-chatbot-jev/releases).
 
 ## Tuân thủ AI tại Việt Nam
