@@ -2,7 +2,7 @@
   "name": "guardrail-chatbot-jev",
   "version": "1.0.0",
   "description": "Content guardrails for AI chatbots, decided by the Jev decision model",
-  "license": "MIT",
+  "license": "CC-BY-NC-4.0",
   "type": "module",
   "engines": {
     "node": ">=20"

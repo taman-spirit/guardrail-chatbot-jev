@@ -7,7 +7,7 @@
 
 <p align="center">
   <a href="https://github.com/taman-spirit/guardrail-chatbot-jev/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/taman-spirit/guardrail-chatbot-jev/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
+  <a href="LICENSE"><img alt="License: CC BY-NC 4.0" src="https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey.svg"></a>
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue.svg">
   <img alt="Node 20+" src="https://img.shields.io/badge/node-20%2B-brightgreen.svg">
 </p>
@@ -562,4 +562,6 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 ## License
 
-[MIT](LICENSE). Use it in anything, commercial included; keep the copyright notice.
+[CC BY-NC 4.0](LICENSE): Creative Commons Attribution-NonCommercial 4.0 International. You may use,
+share and adapt it for non-commercial purposes, with attribution. Commercial use needs separate
+permission from the copyright holder. Releases published before this change (`python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1`) remain under MIT.
