@@ -40,18 +40,18 @@
 
 | リリース | タグ | 内容 | ライセンス |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.3) | `python/v1.1.3` | Python と TypeScript のパッケージ：3 つのチェック、マルチターンの帰属、リアルタイムのレビュー、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.3) | `go/v1.2.3` | 同じエンジンの Go 版。実測・再判定・回帰テストのツール付き | CC BY-NC 4.0 |
-| [Python：ベトナム準拠ポリシー v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.2) | `python-vietnam-compliance-v1.2.2` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
-| [Go：ベトナム準拠ポリシー v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.2) | `go-vietnam-compliance-v1.2.2` | 同じポリシーの Go 版（モジュールバージョン `v1.3.2`） | CC BY-NC 4.0 |
+| [Python SDK 1.1.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.4) | `python/v1.1.4` | Python と TypeScript のパッケージ：3 つのチェック、マルチターンの帰属、リアルタイムのレビュー、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.4) | `go/v1.2.4` | 同じエンジンの Go 版。実測・再判定・回帰テストのツール付き | CC BY-NC 4.0 |
+| [Python：ベトナム準拠ポリシー v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.3) | `python-vietnam-compliance-v1.2.3` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
+| [Go：ベトナム準拠ポリシー v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.3) | `go-vietnam-compliance-v1.2.3` | 同じポリシーの Go 版（モジュールバージョン `v1.3.3`） | CC BY-NC 4.0 |
 
 各リリースノートに内容とインストール方法を記載しています。上の表と同じ順に：
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.3#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.3
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.2
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.4#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.4
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.3#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.3
 ```
 
 Python と TypeScript は `main`、Go は `go-sdk`、ベトナムポリシーは `guardrail-vietnam-compliance`（Python）と
@@ -269,15 +269,16 @@ finding）。
    言い換えを与える場合だけです。謝罪、法律の質問、通報の方法、話題の変更なら効きません。
 
 止めたメッセージは `[earlier message omitted]` として会話に残ります。試みがあったことは覚えていますが、
-本文は二度と読まず、モデルにも見せません。
+本文は二度と読みません。モデルには、メッセージが止められたことと止めたカテゴリ名だけを伝え、本文は見せません。
+そのため「やって」「最初の依頼」といった続きの発言にも、推測ではなく文脈に沿って答えられます。理由はセッションの保存状態に残ります。
 
 | 手順 | コード |
 | --- | --- |
 | 1. ユーザーのメッセージを単独で読む | [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119) |
 | 2. 応答を単独で読む | [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131) |
 | 3. 応答を以前のターンと一緒に読み、効くかを判断する | [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333), [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350) |
-| 会話が「最近リスクあり」とみなされる条件 | [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L95) |
-| 止めたメッセージを印として残し、モデルから隠す | [`Session.record`](python/src/guardrail_chatbot_jev/session.py#L84), [`model_history`](python/src/guardrail_chatbot_jev/session.py#L91) |
+| 会話が「最近リスクあり」とみなされる条件 | [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L128) |
+| 止めたメッセージを印として残し、モデルにはカテゴリだけを伝える（本文は見せない） | [`Session.record`](python/src/guardrail_chatbot_jev/session.py#L99), [`model_history`](python/src/guardrail_chatbot_jev/session.py#L106) |
 | 会話全体のチェック：監視と報告のみで、ターンは止めない | [`check_conversation`](python/src/guardrail_chatbot_jev/guard.py#L170) |
 
 ### ターンごとの例
@@ -368,7 +369,7 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-コード：`V_in` [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119), `V_out` [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131), `W_t` [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L95), `V_ctx`, `c`, `d` [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333) / [`context_questions`](python/src/guardrail_chatbot_jev/questions.py#L135), `A_t`, `⊕` [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350), `risk` [`Session.observe`](python/src/guardrail_chatbot_jev/session.py#L113), `carry` [`Session.advance`](python/src/guardrail_chatbot_jev/session.py#L130)
+コード：`V_in` [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119), `V_out` [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131), `W_t` [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L128), `V_ctx`, `c`, `d` [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333) / [`context_questions`](python/src/guardrail_chatbot_jev/questions.py#L135), `A_t`, `⊕` [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350), `risk` [`Session.observe`](python/src/guardrail_chatbot_jev/session.py#L146), `carry` [`Session.advance`](python/src/guardrail_chatbot_jev/session.py#L163)
 
 ### 単一ターンの較正
 

@@ -3,6 +3,15 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Python Viet Nam compliance 1.2.3] - 2026-09-26
+
+### Changed
+
+- Includes Python 1.1.4: `Session.model_history()` tells the chat model which categories withheld a
+  turn instead of dropping it, and the reason is kept in `as_state` / `from_state`.
+- `Responder.model_history(session, lang)` now works on a session restored from a store: the group,
+  the reply and the crisis line come back the same as before it was stored.
+
 ## [Python Viet Nam compliance 1.2.2] - 2026-09-26
 
 ### Fixed

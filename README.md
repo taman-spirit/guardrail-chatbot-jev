@@ -41,18 +41,18 @@ stack cannot drift apart. Neither package has a third-party dependency.
 
 | Release | Tag | What it is | Licence |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.3) | `python/v1.1.3` | The Python and TypeScript package: three checks, multi-turn attribution, realtime review, cache, prefilter, sessions, streaming, offline tuning and the CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.3) | `go/v1.2.3` | The same engine in Go, with the live, replay and regression test tools | CC BY-NC 4.0 |
-| [Python: Viet Nam compliance policy v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.2) | `python-vietnam-compliance-v1.2.2` | The `vietnam-compliance-v1` policy, with prewritten replies in Vietnamese, English and Chinese | CC BY-NC 4.0 |
-| [Go: Viet Nam compliance policy v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.2) | `go-vietnam-compliance-v1.2.2` | The same policy and replies in Go, as module version `v1.3.2` | CC BY-NC 4.0 |
+| [Python SDK 1.1.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.4) | `python/v1.1.4` | The Python and TypeScript package: three checks, multi-turn attribution, realtime review, cache, prefilter, sessions, streaming, offline tuning and the CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.4) | `go/v1.2.4` | The same engine in Go, with the live, replay and regression test tools | CC BY-NC 4.0 |
+| [Python: Viet Nam compliance policy v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.3) | `python-vietnam-compliance-v1.2.3` | The `vietnam-compliance-v1` policy, with prewritten replies in Vietnamese, English and Chinese | CC BY-NC 4.0 |
+| [Go: Viet Nam compliance policy v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.3) | `go-vietnam-compliance-v1.2.3` | The same policy and replies in Go, as module version `v1.3.3` | CC BY-NC 4.0 |
 
 Each release note lists what the release contains and how to install it. In the same order:
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.3#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.3
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.2
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.4#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.4
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.3#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.3
 ```
 
 Python and TypeScript live on `main`; Go on `go-sdk`; the Viet Nam policy on
@@ -297,7 +297,9 @@ Every turn is decided by answering three questions, in order.
    how to report something, or changing the subject, it does not count.
 
 A message that was stopped stays in the conversation as `[earlier message omitted]`: the guardrail
-remembers that an attempt was made, but never reads its text again, and the chat model never sees it.
+remembers that an attempt was made, but never reads its text again. The chat model is told only that a
+message was withheld and which categories stopped it, never its text, so a follow-up such as "do it" or
+"my first request" is answered in context instead of guessed at. The reason is kept in the stored session.
 A conversation counts as *recently risky* for two turns after a serious finding, and for as long as a
 stopped message is still among the last ten messages.
 
@@ -306,8 +308,8 @@ stopped message is still among the last ten messages.
 | 1. The user's message, read alone | [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119) |
 | 2. The reply, read alone | [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131) |
 | 3. The reply, read with the earlier turns, and whether it counts | [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333), [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350) |
-| When a conversation counts as recently risky | [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L95) |
-| Stopped messages kept as a placeholder, hidden from the model | [`Session.record`](python/src/guardrail_chatbot_jev/session.py#L84), [`model_history`](python/src/guardrail_chatbot_jev/session.py#L91) |
+| When a conversation counts as recently risky | [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L128) |
+| Stopped messages kept as a placeholder; the model is told the category, never the text | [`Session.record`](python/src/guardrail_chatbot_jev/session.py#L99), [`model_history`](python/src/guardrail_chatbot_jev/session.py#L106) |
 | The whole-conversation check: it watches and reports, it never stops a turn | [`check_conversation`](python/src/guardrail_chatbot_jev/guard.py#L170) |
 | A risky conversation's reply is sent whole, not streamed piece by piece | [`guard_stream`](python/src/guardrail_chatbot_jev/streaming.py#L74) |
 
@@ -418,7 +420,7 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-Code: `V_in` [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119), `V_out` [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131), `W_t` [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L95), `V_ctx`, `c`, `d` [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333) / [`context_questions`](python/src/guardrail_chatbot_jev/questions.py#L135), `A_t`, `⊕` [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350), `risk` [`Session.observe`](python/src/guardrail_chatbot_jev/session.py#L113), `carry` [`Session.advance`](python/src/guardrail_chatbot_jev/session.py#L130)
+Code: `V_in` [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119), `V_out` [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131), `W_t` [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L128), `V_ctx`, `c`, `d` [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333) / [`context_questions`](python/src/guardrail_chatbot_jev/questions.py#L135), `A_t`, `⊕` [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350), `risk` [`Session.observe`](python/src/guardrail_chatbot_jev/session.py#L146), `carry` [`Session.advance`](python/src/guardrail_chatbot_jev/session.py#L163)
 
 ### Single-turn calibration
 
@@ -475,7 +477,7 @@ about the law.
 | Dataset | Size | Content | Labels |
 | --- | --- | --- | --- |
 | [`examples/multiturn-live.jsonl`](examples/multiturn-live.jsonl) | 223 conversations | single, repeated and interleaved violations; histories beyond the window; escalations | expected outcome per case; violations referenced by id from the labelled sets |
-| [`examples/multiturn-contamination.jsonl`](examples/multiturn-contamination.jsonl) | 26 scenarios, [`test_the_scenarios`](python/tests/test_multiturn.py#L73) | simulated Jev answers | expected outcome per case |
+| [`examples/multiturn-contamination.jsonl`](examples/multiturn-contamination.jsonl) | 26 scenarios, [`test_the_scenarios`](python/tests/test_multiturn.py#L76) | simulated Jev answers | expected outcome per case |
 | [`cases-input.jsonl`](examples/cases-input.jsonl), [`cases-output.jsonl`](examples/cases-output.jsonl) | 51 cases | single-turn | expected action |
 
 Protocols: **live** [`TestLiveMultiturn`](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/go-sdk/go/live_multiturn_test.go#L96) (Jev, both designs, every raw answer recorded); **replay** [`TestReplayVariants`](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/go-sdk/go/replay_test.go#L224), [`TestReplayConversation`](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/go-sdk/go/replay_test.go#L300), [`TestReplayRealtime`](https://github.com/taman-spirit/guardrail-chatbot-jev/blob/go-sdk/go/replay_test.go#L424) (about 5,000 recorded

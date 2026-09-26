@@ -24,7 +24,7 @@ from .policy import Category, Policy
 from .prefilter import COMMON_PATTERNS, Pattern, PatternPrefilter, Prefilter, prefilter_verdict
 from .questions import build_questions, conversation_state, input_state, output_state
 from .responses import Choice, Responder, detect_language
-from .session import WITHHELD_PLACEHOLDER, Session
+from .session import DECLINED_REPLY, WITHHELD_NOTE, WITHHELD_PLACEHOLDER, WITHHELD_REPLY_NOTE, Session, withheld_label
 from .streaming import StreamEvent, guard_stream
 from .tuning import Record, Report
 from .types import (
@@ -38,7 +38,7 @@ from .types import (
     Verdict,
 )
 
-__version__ = "1.2.2"
+__version__ = "1.2.3"
 
 __all__ = [
     "COMMON_PATTERNS",
@@ -72,6 +72,10 @@ __all__ = [
     "Verdict",
     "VOLATILE_STATE_KEYS",
     "WITHHELD_PLACEHOLDER",
+    "WITHHELD_NOTE",
+    "WITHHELD_REPLY_NOTE",
+    "DECLINED_REPLY",
+    "withheld_label",
     "VerdictCache",
     "auto_transport",
     "build_questions",

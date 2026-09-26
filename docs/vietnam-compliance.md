@@ -113,7 +113,7 @@ return sent
 8. After a withheld turn, send the model `responder.model_history(session, lang)` (Go: `responder.ModelHistory`) rather than the raw
    history. A withheld turn becomes a note naming its group (never its text) followed by the reply
    the user was shown. When the user then says "do it" or "my first request", the model knows what
-   it declined instead of guessing or saying it cannot see the message.
+   it declined instead of guessing or saying it cannot see the message. The group is kept in `session.as_state()`, so this still holds for a session stored between requests and restored with `Session.from_state()`.
 
 ## Step 6. Do not block ordinary questions
 

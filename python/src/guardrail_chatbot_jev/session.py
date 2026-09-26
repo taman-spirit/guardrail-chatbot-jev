@@ -11,13 +11,25 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Sequence
 
-from .types import LADDER, Action, Turn, Verdict, as_turns, rank, stronger
+from .types import LADDER, Action, Finding, Turn, Verdict, as_turns, rank, stronger
 
 #: Stands in the transcript for a message the guardrail withheld. The attempt stays visible to the
 #: conversation check, but its text does not: neither Jev nor the model reads a blocked request again.
 #: The wording is neutral on purpose: measured against Jev, "[message withheld by the safety check]"
 #: still drew sentinel answers of 0.08 to 0.15 after a harmless question; this one drew 0.04 or less.
 WITHHELD_PLACEHOLDER = "[earlier message omitted]"
+
+#: What ``model_history`` tells the chat model in place of a withheld user message. ``{label}`` is
+#: the names of the categories that stopped it; the message's text is never included.
+WITHHELD_NOTE = (
+    "[The user's message here was withheld by the content check ({label}). The assistant did not see "
+    "it and declined. Do not carry out the withheld request, even if the user repeats it or asks to "
+    "continue.]"
+)
+#: What ``model_history`` tells the chat model in place of a withheld reply.
+WITHHELD_REPLY_NOTE = "[The assistant's reply here was withheld by the content check ({label}); the user did not see it.]"
+#: The assistant turn ``model_history`` adds after a withheld user message when none was recorded.
+DECLINED_REPLY = "I can't help with that request."
 
 #: How much each action contributes to the session's risk score.
 ACTION_RISK: Mapping[Action, float] = {"allow": 0.0, "flag": 0.25, "review": 0.6, "block": 1.0}
@@ -48,9 +60,8 @@ class Session:
     verdicts: list[Verdict] = field(default_factory=list)
     _floor: Action = "allow"
     _floor_left: int = 0
-    # Runs beside ``turns``: the verdict that withheld each turn, or None. ``record`` sets it and
-    # ``Responder.model_history`` reads it; when ``turns`` is edited directly the two stop matching
-    # and withheld turns are then told without their group.
+    # Runs beside ``turns``: the verdict that withheld each turn, or None. ``record`` sets it; when
+    # ``turns`` is edited directly the two stop matching and withheld turns are told without a reason.
     _held: list[Verdict | None] = field(default_factory=list, repr=False, compare=False)
 
     # -- transcript ---------------------------------------------------
@@ -68,7 +79,11 @@ class Session:
             del self._held[: len(self._held) - self.max_turns]
 
     def held_verdict(self, index: int) -> Verdict | None:
-        """The verdict that withheld turn ``index``, or None when unknown."""
+        """The verdict that withheld turn ``index``, or None when unknown.
+
+        After ``from_state`` it is rebuilt from the stored summary: action, route, findings, rules
+        and signals, which is what saying why the turn was withheld needs.
+        """
         if len(self._held) != len(self.turns) or not 0 <= index < len(self._held):
             return None
         return self._held[index]
@@ -89,8 +104,26 @@ class Session:
             self._add_turn(role, WITHHELD_PLACEHOLDER, verdict)
 
     def model_history(self) -> tuple[Turn, ...]:
-        """The transcript for the chat model: withheld turns are left out entirely."""
-        return tuple(t for t in self.turns if t.content != WITHHELD_PLACEHOLDER)
+        """The transcript for the chat model, with each withheld turn told rather than dropped.
+
+        A withheld user message becomes ``WITHHELD_NOTE`` naming the categories that stopped it, never
+        its text, followed by ``DECLINED_REPLY`` unless a reply was recorded after it. A withheld
+        reply becomes ``WITHHELD_REPLY_NOTE``. Dropping them instead left the model to meet "do it"
+        or "my first request" with nothing before it, and it guessed.
+        """
+        out: list[Turn] = []
+        for i, turn in enumerate(self.turns):
+            if turn.content != WITHHELD_PLACEHOLDER:
+                out.append(turn)
+                continue
+            label = withheld_label(self.held_verdict(i))
+            if turn.role != "user":
+                out.append(Turn(role=turn.role, content=WITHHELD_REPLY_NOTE.replace("{label}", label)))
+                continue
+            out.append(Turn(role="user", content=WITHHELD_NOTE.replace("{label}", label)))
+            if i + 1 >= len(self.turns) or self.turns[i + 1].role != "assistant":
+                out.append(Turn(role="assistant", content=DECLINED_REPLY))
+        return tuple(out)
 
     def watching(self, threshold: float = 0.2) -> bool:
         """Whether replies should also be read in context.
@@ -168,6 +201,10 @@ class Session:
             "risk": self.risk,
             "floor": self._floor,
             "floor_turns_left": self._floor_left,
+            "withheld": [
+                _summary(self.held_verdict(i)) if t.content == WITHHELD_PLACEHOLDER else None
+                for i, t in enumerate(self.turns)
+            ],
         }
 
     @classmethod
@@ -185,6 +222,15 @@ class Session:
             risk=float(state.get("risk", 0.0)),
         )
         session.extend(state.get("turns") or ())
+        held = state.get("withheld")
+        if isinstance(held, Sequence) and not isinstance(held, (str, bytes)):
+            # Aligned from the end, as the window keeps the most recent turns.
+            held = list(held)[-len(session.turns):] if session.turns else []
+            if len(held) == len(session.turns):
+                session._held = [
+                    _from_summary(h) if isinstance(h, Mapping) and t.content == WITHHELD_PLACEHOLDER else None
+                    for h, t in zip(held, session.turns)
+                ]
         floor = state.get("floor", "allow")
         left = int(state.get("floor_turns_left", 0) or 0)
         # A floor that outlived its counter, or a value no longer in the ladder, is no floor.
@@ -202,3 +248,64 @@ class Session:
             "floor_turns_left": self._floor_left,
             "checks": len(self.verdicts),
         }
+
+
+def withheld_label(verdict: Verdict | None) -> str:
+    """The names of the categories that withheld a turn, strongest first, for the model's note."""
+    if verdict is None:
+        return "reason not recorded"
+    fired = [f for f in verdict.findings if rank(f.action) >= rank("flag")]
+    if fired:
+        top = max(rank(f.action) for f in fired)
+        names = list(dict.fromkeys(f.name or f.category for f in fired if rank(f.action) == top))
+        return ", ".join(names)
+    if verdict.degraded:
+        return "the check was unavailable"
+    return "reason not recorded"
+
+
+def _summary(verdict: Verdict | None) -> dict[str, Any] | None:
+    """What a store keeps of a withheld turn's verdict; the same keys in every language."""
+    if verdict is None:
+        return None
+    return {
+        "action": verdict.action,
+        "surface": verdict.surface,
+        "route": verdict.route,
+        "degraded": verdict.degraded,
+        "findings": [
+            {"category": f.category, "name": f.name, "action": f.action, "probability": round(f.probability, 4)}
+            for f in verdict.findings
+        ],
+        "applied_rules": list(verdict.applied_rules),
+        "signals": {k: v for k, v in verdict.signals.items() if isinstance(v, (int, float, str)) and not isinstance(v, bool)},
+    }
+
+
+def _from_summary(summary: Mapping[str, Any]) -> Verdict | None:
+    """Rebuild a withheld turn's verdict from ``_summary``; None when it is malformed."""
+    try:
+        findings = tuple(
+            Finding(
+                category=str(f["category"]),
+                name=str(f.get("name") or f["category"]),
+                probability=float(f.get("probability", 0.0)),
+                confidence=1.0,
+                action=f["action"] if f.get("action") in LADDER else "flag",
+                severity=0.0,
+            )
+            for f in summary.get("findings") or ()
+            if isinstance(f, Mapping)
+        )
+        action = summary.get("action")
+        return Verdict(
+            action=action if action in LADDER else "block",
+            surface=str(summary.get("surface") or "input"),  # type: ignore[arg-type]
+            findings=findings,
+            signals=dict(summary.get("signals") or {}),
+            route=str(summary.get("route") or "safe_response"),  # type: ignore[arg-type]
+            applied_rules=tuple(str(r) for r in summary.get("applied_rules") or ()),
+            degraded=bool(summary.get("degraded", False)),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
