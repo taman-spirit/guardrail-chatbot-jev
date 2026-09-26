@@ -57,6 +57,7 @@ export function decide(
       confidences[category.id] ?? 1,
       sentinel,
       uncorroborated,
+      corroboration?.weakExcept.has(category.id) ?? false,
     );
     if (finding) findings.push(finding);
   }
@@ -305,6 +306,7 @@ function toFinding(
   confidence: number,
   sentinel = false,
   uncorroborated = false,
+  neverWeak = false,
 ): Finding | undefined {
   const bands = policy.thresholds(category, surface);
   if (!bands) return undefined;
@@ -319,7 +321,9 @@ function toFinding(
   if (category.route && CATEGORY_ROUTES.has(category.route)) notes.push(`handled by ${category.route}`);
   // A sentinel alone, which the hazard choice does not back, answers at its own band: it may still
   // reach block by crossing the block band, but never_below does not lift it there.
-  const weak = uncorroborated && probability < bands.block;
+  // A category in weak_except (self-harm, for one) is never weakened: its crisis handling is
+  // support, not a penalty, so a lone sentinel still reaches it.
+  const weak = uncorroborated && probability < bands.block && !neverWeak;
   if (category.never_below && weak) {
     notes.push(`uncorroborated sentinel: never below ${category.never_below} not applied`);
   } else if (category.never_below) {

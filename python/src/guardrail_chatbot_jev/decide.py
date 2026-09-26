@@ -57,6 +57,7 @@ def decide(
                 uncorroborated=corroboration is not None
                 and cat.id in sentinel_sourced
                 and _num(choice.get(cat.id)) < corroboration.min_choice,
+                never_weak=corroboration is not None and cat.id in corroboration.weak_except,
             )
         )
     ]
@@ -198,6 +199,7 @@ def _finding(
     *,
     sentinel: bool = False,
     uncorroborated: bool = False,
+    never_weak: bool = False,
 ) -> Finding | None:
     bands = cat.threshold(surface)
     if not bands:
@@ -216,7 +218,9 @@ def _finding(
         notes.append(f"handled by {cat.route}")
     # A sentinel alone, which the hazard choice does not back, answers at its own band: it may still
     # reach block by crossing the block band, but never_below does not lift it there.
-    weak = uncorroborated and probability < bands["block"]
+    # A category in weak_except (self-harm, for one) is never weakened: its crisis handling is
+    # support, not a penalty, so a lone sentinel still reaches it.
+    weak = uncorroborated and probability < bands["block"] and not never_weak
     if cat.never_below and weak:
         notes.append(f"uncorroborated sentinel: never below {cat.never_below} not applied")
     elif cat.never_below:

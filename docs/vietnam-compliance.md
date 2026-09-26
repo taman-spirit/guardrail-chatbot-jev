@@ -137,7 +137,9 @@ The thresholds in the policy are numbers someone chose, not numbers anyone measu
 
 ## Step 8. Keep a human in the loop
 
-1. Content at `review` needs a person. Staff a queue for it.
+1. Content at `review` needs a person. Staff a queue for it. In a realtime chat nobody can look before
+   the reply is due, so use `review_handling="audit"`: review content is delivered and queued for
+   the audit, and only `block` stops content.
 2. Record every verdict through the `observer`: policy id, violation group, rules applied. Count
    `degraded` verdicts separately, because the guardrail checked nothing when they happened.
 3. By default the input check lets content through when the content check is down, and the output

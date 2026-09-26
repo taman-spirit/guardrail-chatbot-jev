@@ -81,6 +81,8 @@ export interface SentinelCorroboration {
    * masked and delivered, unless it reaches this value. Zero is off.
    */
   readonly redactInsteadOfBlockBelow: number;
+  /** Categories never weakened: an uncorroborated sentinel keeps never_below and is not capped. */
+  readonly weakExcept: ReadonlySet<string>;
 }
 
 /** When a low-confidence answer escalates to review. */
@@ -229,6 +231,7 @@ export class Policy {
       refusalExcept: new Set(stringsOf(raw["refusal_except"])),
       weakAtMostFlag: truthy(raw["weak_at_most_flag"]),
       redactInsteadOfBlockBelow: numberOr(raw["redact_instead_of_block_below"], 0),
+      weakExcept: new Set(stringsOf(raw["weak_except"])),
     };
   }
 

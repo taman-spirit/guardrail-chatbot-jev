@@ -3,6 +3,17 @@
   "version": "1.0.0",
   "name": "Standard v1 plus Viet Nam compliance",
   "summary": "The shipped taxonomy plus the content rules an AI service in Viet Nam has to meet under the Law on Artificial Intelligence and the Law on Cybersecurity.",
+  "defaults": {
+    "sentinel_corroboration": {
+      "min_choice": 0.02,
+      "refusal": 0.8,
+      "refusal_max_sentinel": 0.5,
+      "refusal_except": ["sid", "prv", "ipv", "vsv", "vld"],
+      "weak_at_most_flag": true,
+      "redact_instead_of_block_below": 0.8,
+      "weak_except": ["ssh", "vsv", "vld"]
+    }
+  },
   "categories": {
     "vsv": {
       "name": "Territorial sovereignty of Viet Nam",
@@ -190,9 +201,9 @@
       }
     },
     "review": {
-      "vi": "Yêu cầu của bạn cần được nhân viên xem xét thêm trước khi phản hồi. Cảm ơn bạn đã kiên nhẫn.",
-      "en": "Your request needs a further look from our staff before we reply. Thank you for your patience.",
-      "zh": "你的请求需要工作人员进一步审核后才能回复。感谢你的耐心。"
+      "vi": "Mình chưa thể trả lời đầy đủ câu này. Bạn thử diễn đạt lại, hoặc hỏi về một khía cạnh khác nhé.",
+      "en": "I can't fully answer this one. Could you rephrase it, or ask about a different aspect?",
+      "zh": "这个问题我暂时无法完整回答。你可以换个说法，或者问问其他方面。"
     },
     "unavailable": {
       "vi": "Hệ thống kiểm duyệt nội dung đang tạm thời gián đoạn nên mình chưa thể trả lời. Bạn vui lòng thử lại sau ít phút nhé.",

@@ -555,3 +555,11 @@ test("checkTurn runs in order, so a withheld input puts the reply under the watc
     ["user_message", CONTEXT_EVALUATING, "assistant_reply", "conversation"],
   );
 });
+
+test("self-harm is never weakened", () => {
+  const policy = Policy.bundled();
+  const v = decide(policy, "input", answers({ s_ssh: noul(0.2) }));
+  assert.equal(v.route, "crisis_support");
+  const weak = decide(policy, "input", answers({ hazard: hazard({ ssh: 0.01 }, 0.98), s_ssh: noul(0.07) }));
+  assert.equal(weak.route, "deliver");
+});

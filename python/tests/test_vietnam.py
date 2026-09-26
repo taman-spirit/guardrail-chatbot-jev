@@ -163,7 +163,7 @@ def test_a_sovereignty_review_still_ends_with_the_affirmation(vn: Policy, respon
     assert verdict.action == "review"
     text = responder.blocking_response([verdict], language="en")
     assert text is not None
-    assert text.startswith("Your request needs a further look")
+    assert text.startswith("I can't fully answer this one")
     assert text.endswith(responder.affirmation("en"))
 
 
