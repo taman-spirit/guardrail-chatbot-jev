@@ -438,7 +438,7 @@ cổng tự tin:  conf < 0.65 ∧ (có phát hiện ∨ p ≥ θ_flag / 2) → r
 hội thoại:    escalation ≤ 0.5 → tối đa flag,  trừ cse, ssh
 ```
 
-Code: `u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
+Code: `u_k` [`Decide`](go/decide.go#L43), `never_below` [`finding`](go/decide.go#L282), weak [`Decide`](go/decide.go#L67), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L178), redact [`Decide`](go/decide.go#L54), gate [`confidenceGate`](go/decide.go#L427), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L700), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L32), [`spc`](policies/standard-v1.json#L328), [`ncr`](policies/standard-v1.json#L207), [`iwp`](policies/standard-v1.json#L83)
 
 Ngoài ra: `spc` chỉ chấm ở từng câu trả lời; mô tả `ncr` và `iwp` loại trừ người bị hại và câu hỏi về
 pháp luật.

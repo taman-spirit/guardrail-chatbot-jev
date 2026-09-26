@@ -419,7 +419,7 @@ confidence gate:  conf < 0.65 ∧ (finding ∨ p ≥ θ_flag / 2) → review,  u
 conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
 ```
 
-Code : `u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
+Code : `u_k` [`Decide`](go/decide.go#L43), `never_below` [`finding`](go/decide.go#L282), weak [`Decide`](go/decide.go#L67), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L178), redact [`Decide`](go/decide.go#L54), gate [`confidenceGate`](go/decide.go#L427), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L700), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L32), [`spc`](policies/standard-v1.json#L328), [`ncr`](policies/standard-v1.json#L207), [`iwp`](policies/standard-v1.json#L83)
 
 ### Revue en temps réel
 
