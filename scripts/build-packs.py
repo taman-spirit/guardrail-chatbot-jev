@@ -8,7 +8,7 @@ An overlay is layered on standard-v1 instead of forking it, so a change to the s
 reaches every derived pack on the next build. Categories and signals merge by key, a rule with a
 shipped id updates that rule in place, and anything else at the top level replaces the base value.
 
-The merge is one level deep. A category or signal patch replaces each key it names whole, so a
+The merge is one level deep; "defaults" merges by key. A category or signal patch replaces each key it names whole, so a
 patch that sets "thresholds" replaces every surface's bands, not just the ones it lists; a rule
 patch replaces "when" or "then" whole in the same way. Restate what you mean to keep.
 
@@ -50,8 +50,12 @@ def merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
             order.append(rule["id"])
     data["rules"] = [by_id[rid] for rid in order]
 
+    # defaults merge by key, so an overlay can set one setting without dropping the others.
+    if isinstance(patch.get("defaults"), dict):
+        data["defaults"] = {**(data.get("defaults") or {}), **copy.deepcopy(patch["defaults"])}
+
     for key, value in patch.items():
-        if key not in ("categories", "signals", "rules"):
+        if key not in ("categories", "signals", "rules", "defaults"):
             data[key] = copy.deepcopy(value)
 
     everything = list(data["categories"])

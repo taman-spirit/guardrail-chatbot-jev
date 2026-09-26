@@ -37,6 +37,30 @@ class Category:
         return self.enabled and surface in self.surfaces
 
 
+@dataclass(frozen=True, slots=True)
+class SentinelCorroboration:
+    """How a pack asks for a sentinel to be backed by the hazard choice before it can drive the
+    strongest actions on its own. See ``defaults.sentinel_corroboration``."""
+
+    min_choice: float
+    refusal: float
+    refusal_max_sentinel: float
+    refusal_except: frozenset[str]
+    weak_at_most_flag: bool
+    redact_instead_of_block_below: float
+    #: Categories never weakened: an uncorroborated sentinel keeps never_below and is not capped.
+    weak_except: frozenset[str] = frozenset()
+
+
+@dataclass(frozen=True, slots=True)
+class ConfidenceGateOptions:
+    """When a low-confidence answer escalates to review. See ``defaults.confidence_gate``."""
+
+    needs_corroboration: bool
+    skip_when_intent: frozenset[str]
+    skip_min_confidence: float
+
+
 class Policy:
     """A parsed policy pack.
 
@@ -147,6 +171,31 @@ class Policy:
         if isinstance(setting, Mapping):
             setting = setting.get(surface or "", "fail_closed")
         return str(setting) == "fail_closed"
+
+    def sentinel_corroboration(self) -> SentinelCorroboration | None:
+        """The pack's ``defaults.sentinel_corroboration``, or ``None`` when it is off."""
+        raw = self.defaults.get("sentinel_corroboration")
+        if not isinstance(raw, Mapping):
+            return None
+        return SentinelCorroboration(
+            min_choice=float(raw.get("min_choice", 0.02)),
+            refusal=float(raw.get("refusal", 0.8)),
+            refusal_max_sentinel=float(raw.get("refusal_max_sentinel", 0.5)),
+            refusal_except=frozenset(raw.get("refusal_except") or ()),
+            weak_at_most_flag=bool(raw.get("weak_at_most_flag", False)),
+            redact_instead_of_block_below=float(raw.get("redact_instead_of_block_below", 0) or 0),
+            weak_except=frozenset(raw.get("weak_except") or ()),
+        )
+
+    def confidence_gate(self) -> ConfidenceGateOptions:
+        """The pack's ``defaults.confidence_gate`` options."""
+        raw = self.defaults.get("confidence_gate")
+        raw = raw if isinstance(raw, Mapping) else {}
+        return ConfidenceGateOptions(
+            needs_corroboration=bool(raw.get("needs_corroboration", False)),
+            skip_when_intent=frozenset(raw.get("skip_when_intent") or ()),
+            skip_min_confidence=float(raw.get("skip_min_confidence", 0.5)),
+        )
 
     def error_action(self) -> str:
         return str(self.defaults.get("error_action", "review"))

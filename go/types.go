@@ -36,6 +36,9 @@ const (
 	RouteCrisisSupport Route = "crisis_support"
 	RouteHumanReview   Route = "human_review"
 	RouteSafeResponse  Route = "safe_response"
+	// RouteDeliverAndAudit sends the content now and queues it for a person to look at later; see
+	// ReviewAsAudit.
+	RouteDeliverAndAudit Route = "deliver_and_audit"
 )
 
 // Surfaces lists every surface, in the order the checks run.
@@ -103,6 +106,11 @@ type Finding struct {
 	Refs        []string
 	Source      string
 	Notes       []string
+	// Uncorroborated is true for a finding raised by a sentinel alone while the hazard choice gave
+	// its category next to nothing; see Policy.SentinelCorroboration.
+	Uncorroborated bool
+	// weak is an uncorroborated finding below its block band: never_below does not lift it.
+	weak bool
 }
 
 // MarshalJSON writes the same shape as the Python package's Finding.as_dict.
@@ -150,6 +158,11 @@ type Verdict struct {
 	Partial bool
 	// Prefilter names the rule when a prefilter decided without calling Jev.
 	Prefilter string
+	// Context is what the in-context output check found, when it ran.
+	Context *ContextRead
+	// Audit says whether a person should look at this later: "priority" for review or worse,
+	// "sample" for a flag, "" for nothing. It is independent of whether the content was delivered.
+	Audit string
 }
 
 // Allowed is true when the content may be delivered as-is or with a flag only.
@@ -230,6 +243,8 @@ func (v Verdict) MarshalJSON() ([]byte, error) {
 		"partial":       v.Partial,
 		"prefilter":     nullable(v.Prefilter),
 		"error":         nullable(v.Error),
+		"context":       v.Context,
+		"audit":         nullable(v.Audit),
 	})
 }
 

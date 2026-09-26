@@ -19,11 +19,11 @@ from .client import (
     auto_transport,
 )
 from .decide import decide, error_verdict, with_floor
-from .guard import Guard
+from .guard import ContextCheck, Guard
 from .policy import Category, Policy
 from .prefilter import COMMON_PATTERNS, Pattern, PatternPrefilter, Prefilter, prefilter_verdict
 from .questions import build_questions, conversation_state, input_state, output_state
-from .session import Session
+from .session import WITHHELD_PLACEHOLDER, Session
 from .streaming import StreamEvent, guard_stream
 from .tuning import Record, Report
 from .types import (
@@ -37,7 +37,7 @@ from .types import (
     Verdict,
 )
 
-__version__ = "1.0.1"
+__version__ = "1.1.1"
 
 __all__ = [
     "COMMON_PATTERNS",
@@ -45,6 +45,7 @@ __all__ = [
     "Action",
     "Answers",
     "Category",
+    "ContextCheck",
     "Finding",
     "Guard",
     "GuardrailError",
@@ -67,6 +68,7 @@ __all__ = [
     "Usage",
     "Verdict",
     "VOLATILE_STATE_KEYS",
+    "WITHHELD_PLACEHOLDER",
     "VerdictCache",
     "auto_transport",
     "build_questions",

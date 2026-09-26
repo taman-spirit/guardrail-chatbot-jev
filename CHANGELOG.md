@@ -3,6 +3,44 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Go 1.3.0, Viet Nam compliance 1.2] - 2026-09-26
+
+### Changed
+
+- Includes Go 1.2.1: multi-turn attribution, realtime review as audit, sentinel corroboration.
+- The Viet Nam pack never weakens a lone self-harm, sovereignty or leader signal
+  (`sentinel_corroboration.weak_except: ["ssh", "vsv", "vld"]`), and a refusal does not excuse a
+  sovereignty or leader claim.
+- The review reply no longer promises a staff reply that a realtime chat cannot give.
+
+## [Go 1.2.1, Python 1.1.1] - 2026-09-26
+
+### Fixed
+
+- Go, Python and TypeScript: a lone self-harm sentinel in the review band is no longer weakened to flag, so it still reaches
+  the crisis response: `sentinel_corroboration.weak_except` keeps `ssh` whole. A flag-band one
+  still does not replace an ordinary answer.
+
+## [Go 1.2.0, Python 1.1.0] - 2026-09-26
+
+### Changed
+
+- Multi-turn, in Go, Python and TypeScript (the Go engine was first released as `go-multiturn-v1`): a turn is held only for what it or its reply does. The input check never reads the
+  history; in a watched session the reply is also read in context, and those findings count only
+  when the reply completes an earlier harmful request. `MultiturnFloor` keeps the earlier floor.
+- Withheld turns are kept as `[earlier message omitted]` and left out of `Session.ModelHistory()`;
+  the session's risk is no longer sent to Jev; a transcript of withheld turns alone is not checked.
+- `standard-v1`: sentinel corroboration, a confidence gate that respects benign intent, a cap for
+  conversations that are not escalating, specialised advice judged per reply, and `ncr` / `iwp`
+  descriptions that exclude victims and questions about the law.
+
+### Added
+
+- `ReviewHandling: ReviewAsAudit` for realtime chat, and an `audit` level on every verdict.
+- `examples/multiturn-live.jsonl` (223 conversations) and `examples/multiturn-contamination.jsonl`
+  (26 simulated scenarios); live, replay and regression tests in `go/` behind the `live` and
+  `replay` build tags.
+
 ## [Go 1.1.1] - 2026-09-23
 
 ### Added
@@ -21,6 +59,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 - A rule can set `skip_confidence_gate`, so that low confidence alone does not hold content the
   rule vouches for. A finding a rule capped to `allow` no longer sets the route.
+- The licence is now CC BY-NC 4.0 (Creative Commons Attribution-NonCommercial 4.0 International).
+
+## [Go 1.0.1] - 2026-09-23
+
+### Added
+
+- A Go module in `go/`, a port of the Python package: the three checks, `CheckTurn`, the cache,
+  prefilter, session, streaming over channels, the recording transports, offline tuning and the
+  command line. It embeds the same policy pack, sends the same request and reaches the same
+  verdict for the same answers; sessions saved by one language restore in the other. No
+  third-party dependencies.
+
+### Changed
+
 - The licence is now CC BY-NC 4.0 (Creative Commons Attribution-NonCommercial 4.0 International).
 
 ## [1.0.0]

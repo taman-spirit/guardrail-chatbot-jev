@@ -40,7 +40,7 @@
 
 ## 第四步：接入应用
 
-Python（`Responder` 包含在发布版本 `python-vietnam-compliance-v1` 中，位于分支 `guardrail-vietnam-compliance`）：
+Python：
 
 ```python
 from guardrail_chatbot_jev import Guard, Responder, detect_language
@@ -120,7 +120,8 @@ return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
 
 ## 第八步：保留人工监督
 
-1. `review` 级别的内容需要人工处理，请安排审核队列和人员。
+1. `review` 级别的内容需要人工处理，请安排审核队列和人员。实时聊天中无人能在回复前审核，因此请使用
+   `review_handling="audit"`：`review` 级别的内容照常发送并进入事后审核队列，只有 `block` 会阻止内容。
 2. 通过 `observer` 记录每一个结果：策略编号、违规组别、已触发的规则。单独统计 `degraded` 结果，因为此时护栏实际上没有进行任何检查。
 3. 默认情况下，审核系统中断时输入检查放行，输出检查拦截。如有不同要求，请修改 `defaults.on_error`。
 

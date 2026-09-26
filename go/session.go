@@ -103,11 +103,15 @@ func (s *Session) raise(floor Action) {
 }
 
 // Metadata is the deployment context worth putting in front of Jev on later turns.
+//
+// The session's risk score is deliberately not in it. A score in front of Jev invites it to judge
+// the current message by the conversation's past, which is the contamination the session exists to
+// avoid; the risk is carried by the session itself, and it also varied under a cache key that
+// ignores deployment context.
 func (s *Session) Metadata() map[string]any {
 	return map[string]any{
 		"conversation_id": s.ID,
 		"turn_number":     len(s.Turns) + 1,
-		"session_risk":    round(s.Risk, 3),
 	}
 }
 

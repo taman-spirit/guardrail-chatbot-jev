@@ -46,6 +46,8 @@ export interface StreamOptions {
 
 interface OutputChecker {
   checkOutput(reply: string, options: Record<string, unknown>): Promise<Verdict>;
+  /** Whether the reply is held whole for the final check; see `Guard.holdsWholeReply`. */
+  holdsWholeReply?(session: Session | undefined): boolean;
 }
 
 /**
@@ -58,7 +60,12 @@ export async function* guardStream(
   source: AsyncIterable<string>,
   options: StreamOptions = {},
 ): AsyncGenerator<StreamEvent> {
-  const chunkChars = options.chunkChars ?? 280;
+  // Mid-stream checks read each chunk on its own. In a watched session a part that is harmful only
+  // in the light of earlier turns would get past them, so the reply is held whole for the final
+  // check, which reads it in context.
+  const chunkChars = guard.holdsWholeReply?.(options.session)
+    ? Number.POSITIVE_INFINITY
+    : (options.chunkChars ?? 280);
   const base = {
     ...(options.userMessage === undefined ? {} : { userMessage: options.userMessage }),
     ...(options.context ? { context: options.context } : {}),

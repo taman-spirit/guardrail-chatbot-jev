@@ -78,6 +78,31 @@ For the same answers, the Go module picks the same reply as the Python `Responde
 The step-by-step guide: [Tiếng Việt](../docs/vietnam-compliance.vi.md) ·
 [English](../docs/vietnam-compliance.md) · [中文](../docs/vietnam-compliance.zh.md).
 
+## Multi-turn and realtime chat
+
+| Component | Rule |
+| --- | --- |
+| Input check | `q_t` only; no history, no session risk. |
+| Output check | `r_t` alone; in a watched session also `r_t` given `H_t`, in parallel. |
+| Attribution | In-context findings count only if the reply completes an earlier harmful request. |
+| Withheld turns | Kept as `[earlier message omitted]`; excluded from `Session.ModelHistory()`. |
+| Realtime | `ReviewAsAudit`: only `block` stops content; every verdict carries an `audit` level. |
+
+```go
+guard := guardrail.New(guardrail.Options{ReviewHandling: guardrail.ReviewAsAudit})
+session := guardrail.NewSession(conversationID)
+
+in, _ := guard.CheckInput(ctx, message, &guardrail.CheckOptions{Session: session})
+session.Record("user", message, in)
+reply := callModel(session.ModelHistory(), message)
+out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{Session: session, UserMessage: message})
+session.Record("assistant", reply, out)
+session.Advance()
+```
+
+Live, 223 conversations: harmless turns held 171 / 194 → 0 / 194; harmful replies and escalations
+all caught. Definitions, evaluation and results: [main README](../README.md#multi-turn).
+
 ## Streaming
 
 ```go
@@ -111,7 +136,9 @@ Python exits `2` or `1`, so that a verdict code only ever means a verdict.
 ## Tests
 
 ```bash
-cd go && go test -race ./...
+cd go && go test -race ./...                                    # no key, no network
+JEV_API_KEY=... go test -tags live -run TestLiveMultiturn -v ./  # 223 conversations against Jev
+REPLAY_DIRS='/tmp/mt*' go test -tags replay -run TestReplay -v ./ # offline, from recorded answers
 ```
 
 No API key and no network: the suite decides against recorded answers.

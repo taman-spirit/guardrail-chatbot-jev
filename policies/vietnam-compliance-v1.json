@@ -19,7 +19,32 @@
       "output": "fail_closed",
       "conversation": "fail_open"
     },
-    "error_action": "review"
+    "error_action": "review",
+    "sentinel_corroboration": {
+      "min_choice": 0.02,
+      "refusal": 0.8,
+      "refusal_max_sentinel": 0.5,
+      "refusal_except": [
+        "sid",
+        "prv",
+        "ipv",
+        "vsv",
+        "vld"
+      ],
+      "weak_at_most_flag": true,
+      "redact_instead_of_block_below": 0.8,
+      "weak_except": [
+        "ssh",
+        "vsv",
+        "vld"
+      ]
+    },
+    "confidence_gate": {
+      "skip_when_intent": [
+        "benign"
+      ],
+      "skip_min_confidence": 0.5
+    }
   },
   "severity_scale": [
     "none: nothing in the content touches the hazard",
@@ -69,7 +94,7 @@
     },
     "iwp": {
       "name": "Indiscriminate weapons (CBRNE)",
-      "description": "Chemical, biological, radiological, nuclear or high-yield explosive weapons: synthesis routes, agent selection, enhancement, weaponization or dispersal.",
+      "description": "Chemical, biological, radiological, nuclear or high-yield explosive weapons: synthesis routes, agent selection, enhancement, weaponization or dispersal. It is not a question about the law, the penalties, the history or the news of such weapons.",
       "refs": [
         "AILuminate iwp",
         "Llama Guard S9"
@@ -193,7 +218,7 @@
     },
     "ncr": {
       "name": "Non-violent crimes",
-      "description": "Fraud, scams, theft, drug trafficking, cybercrime, malware, money laundering or evading law enforcement.",
+      "description": "Fraud, scams, theft, drug trafficking, cybercrime, malware, money laundering or evading law enforcement. It is not a victim, or someone worried about becoming one, asking how to recognise, report or recover from fraud or a scam.",
       "refs": [
         "AILuminate ncr",
         "Llama Guard S2"
@@ -318,8 +343,7 @@
         "Llama Guard S6"
       ],
       "surfaces": [
-        "output",
-        "conversation"
+        "output"
       ],
       "weight": 0.5,
       "base_severity": 2,
@@ -845,6 +869,22 @@
       }
     },
     {
+      "id": "no-escalation-caps-conversation",
+      "when": {
+        "signal": "escalation",
+        "op": "<=",
+        "value": 0.5
+      },
+      "except_categories": [
+        "cse",
+        "ssh"
+      ],
+      "then": {
+        "cap_action": "flag"
+      },
+      "why": "A conversation that is not moving toward a harmful objective is not a multi-turn attack, whatever topics it has touched. Measured live, this halves the harmless conversations sent to review and keeps every escalation."
+    },
+    {
       "id": "neutral-mention-is-not-a-violation",
       "when": {
         "signal": "neutral_mention",
@@ -1034,9 +1074,9 @@
       }
     },
     "review": {
-      "vi": "Yêu cầu của bạn cần được nhân viên xem xét thêm trước khi phản hồi. Cảm ơn bạn đã kiên nhẫn.",
-      "en": "Your request needs a further look from our staff before we reply. Thank you for your patience.",
-      "zh": "你的请求需要工作人员进一步审核后才能回复。感谢你的耐心。"
+      "vi": "Mình chưa thể trả lời đầy đủ câu này. Bạn thử diễn đạt lại, hoặc hỏi về một khía cạnh khác nhé.",
+      "en": "I can't fully answer this one. Could you rephrase it, or ask about a different aspect?",
+      "zh": "这个问题我暂时无法完整回答。你可以换个说法，或者问问其他方面。"
     },
     "unavailable": {
       "vi": "Hệ thống kiểm duyệt nội dung đang tạm thời gián đoạn nên mình chưa thể trả lời. Bạn vui lòng thử lại sau ít phút nhé.",

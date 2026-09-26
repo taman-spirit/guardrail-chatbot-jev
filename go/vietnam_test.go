@@ -185,7 +185,7 @@ func TestASovereigntyReviewStillEndsWithTheAffirmation(t *testing.T) {
 	r := vnResponder(t, "")
 	v := decideOn(vn(t), SurfaceOutput, vnAnswers(A{"s_vsv": noul(0.3), "refusal": noul(0)}))
 	text, ok := r.BlockingResponse(vs(v), "en")
-	if v.Action != Review || !ok || !strings.HasPrefix(text, "Your request needs a further look") || !strings.HasSuffix(text, r.Affirmation("en")) {
+	if v.Action != Review || !ok || !strings.HasPrefix(text, "I can't fully answer this one") || !strings.HasSuffix(text, r.Affirmation("en")) {
 		t.Fatalf("%s %q", v.Action, text)
 	}
 	conv := decideOn(vn(t), SurfaceConversation, vnAnswers(A{"s_vsv": noul(0.8)}))

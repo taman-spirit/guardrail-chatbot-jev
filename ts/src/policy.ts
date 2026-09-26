@@ -60,6 +60,42 @@ export interface PolicyPack {
   readonly [scale: string]: unknown;
 }
 
+/** How a pack asks for a sentinel to be backed by the hazard choice. */
+export interface SentinelCorroboration {
+  /** The hazard-choice probability below which a sentinel counts as uncorroborated. */
+  readonly minChoice: number;
+  /** The refusal score from which a reply counts as declining. */
+  readonly refusal: number;
+  /** The sentinel answer from which even a declining reply is not capped. */
+  readonly refusalMaxSentinel: number;
+  /** Categories a declining reply can still carry, so they are never capped. */
+  readonly refusalExcept: ReadonlySet<string>;
+  /**
+   * Cap an uncorroborated sentinel below its block band at flag: it is recorded and delivered,
+   * rather than held, unless it crosses the block band on its own.
+   */
+  readonly weakAtMostFlag: boolean;
+  /**
+   * Resolve an uncorroborated sentinel for a category handled by redaction to review, so it is
+   * masked and delivered, unless it reaches this value. Zero is off.
+   */
+  readonly redactInsteadOfBlockBelow: number;
+  /** Categories never weakened: an uncorroborated sentinel keeps never_below and is not capped. */
+  readonly weakExcept: ReadonlySet<string>;
+}
+
+/** When a low-confidence answer escalates to review. */
+export interface ConfidenceGateOptions {
+  /** Count only findings and near misses the hazard choice backs. */
+  readonly needsCorroboration: boolean;
+  /**
+   * Intent labels for which the gate does not escalate, as long as the answer's confidence is at
+   * least `skipMinConfidence`: below that the intent is itself a guess.
+   */
+  readonly skipWhenIntent: ReadonlySet<string>;
+  readonly skipMinConfidence: number;
+}
+
 export interface Category extends CategorySpec {
   readonly id: string;
 }
@@ -178,6 +214,37 @@ export class Policy {
     return String(setting) === "fail_closed";
   }
 
+  /**
+   * The pack's `defaults.sentinel_corroboration`, or undefined when the pack does not set it.
+   *
+   * It is how a pack asks for a sentinel to be backed by the hazard choice before it can drive the
+   * strongest actions on its own.
+   */
+  sentinelCorroboration(): SentinelCorroboration | undefined {
+    const raw = this.raw.defaults?.["sentinel_corroboration"];
+    if (!isRecord(raw)) return undefined;
+    return {
+      minChoice: numberOr(raw["min_choice"], 0.02),
+      refusal: numberOr(raw["refusal"], 0.8),
+      refusalMaxSentinel: numberOr(raw["refusal_max_sentinel"], 0.5),
+      refusalExcept: new Set(stringsOf(raw["refusal_except"])),
+      weakAtMostFlag: truthy(raw["weak_at_most_flag"]),
+      redactInsteadOfBlockBelow: numberOr(raw["redact_instead_of_block_below"], 0),
+      weakExcept: new Set(stringsOf(raw["weak_except"])),
+    };
+  }
+
+  /** The pack's `defaults.confidence_gate` options. */
+  confidenceGate(): ConfidenceGateOptions {
+    const setting = this.raw.defaults?.["confidence_gate"];
+    const raw = isRecord(setting) ? setting : {};
+    return {
+      needsCorroboration: truthy(raw["needs_corroboration"]),
+      skipWhenIntent: new Set(stringsOf(raw["skip_when_intent"])),
+      skipMinConfidence: numberOr(raw["skip_min_confidence"], 0.5),
+    };
+  }
+
   errorAction(): Action {
     return (this.raw.defaults?.["error_action"] ?? "review") as Action;
   }
@@ -188,6 +255,34 @@ export class Policy {
 }
 
 import type { Action } from "./types.js";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function numberOr(value: unknown, fallback: number): number {
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  return fallback;
+}
+
+function stringsOf(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((item) => String(item)) : [];
+}
+
+/** Truthiness the way the Python and Go packages read a pack setting. */
+function truthy(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return value !== "";
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return typeof value !== "number" || value !== 0;
+}
 
 function validate(policy: Policy): void {
   if (policy.categories.size === 0) throw new Error("policy pack has no categories");

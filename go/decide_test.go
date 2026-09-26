@@ -214,3 +214,146 @@ func TestASentinelStillInheritsAShakyRequest(t *testing.T) {
 		t.Fatalf("got %+v", v)
 	}
 }
+
+func TestAnUncorroboratedSentinelAnswersAtItsOwnBand(t *testing.T) {
+	p := bundled(t)
+	// The choice backs it (0.04 is well above 0.01): never_below still lifts it to block.
+	if v := decideOn(p, SurfaceInput, answers(A{"hazard": hazard(P{"cse": 0.04})})); v.Action != Block {
+		t.Fatalf("corroborated: %s", v.Action)
+	}
+	// A sentinel on its own, the choice giving cse nothing.
+	cases := []struct {
+		sentinel float64
+		want     Action
+	}{{0.04, Flag}, {0.1, Flag}, {0.2, Block}}
+	for _, c := range cases {
+		v := decideOn(p, SurfaceInput, answers(A{"s_cse": noul(c.sentinel)}))
+		if v.Action != c.want || !v.Top().Uncorroborated {
+			t.Fatalf("s_cse=%v: got %s, want %s (%+v)", c.sentinel, v.Action, c.want, v.Top())
+		}
+	}
+}
+
+func TestARefusalIsNotBlockedForAnUncorroboratedSentinel(t *testing.T) {
+	p := bundled(t)
+	refusing := answers(A{"s_cse": noul(0.23), "s_iwp": noul(0.14), "refusal": noul(0.9)})
+	if v := decideOn(p, SurfaceOutput, refusing); v.Action != Flag || !v.Deliverable() {
+		t.Fatalf("got %+v", v)
+	}
+	// A refusal can still leak a system prompt: sid is exempt from the cap.
+	leaking := answers(A{"s_sid": noul(0.35), "refusal": noul(0.9)})
+	if v := decideOn(p, SurfaceOutput, leaking); v.Deliverable() {
+		t.Fatalf("a refusal leaking a system prompt got through: %+v", v)
+	}
+	// A strong sentinel is not capped, refusal or not.
+	if v := decideOn(p, SurfaceOutput, answers(A{"s_cse": noul(0.6), "refusal": noul(0.9)})); v.Action != Block {
+		t.Fatalf("got %s", v.Action)
+	}
+	// Without the pack setting, nothing changes.
+	var pack map[string]any
+	data, _ := bundledPacks.ReadFile("policies/standard-v1.json")
+	_ = json.Unmarshal(data, &pack)
+	delete(pack["defaults"].(map[string]any), "sentinel_corroboration")
+	old, _ := NewPolicy(pack)
+	if v := decideOn(old, SurfaceOutput, refusing); v.Action != Block {
+		t.Fatalf("with the setting removed: %s", v.Action)
+	}
+}
+
+func TestAWeakUncorroboratedSelfHarmSignalDoesNotReplaceTheAnswer(t *testing.T) {
+	p := bundled(t)
+	// "Còn ăn uống thì sao?" in a travel conversation, measured: s_ssh 0.07, choice ssh 0.01.
+	v := decideOn(p, SurfaceInput, answers(A{"hazard": hazard(P{"ssh": 0.01}, 0.98), "s_ssh": noul(0.07)}))
+	if v.Action != Flag || v.Route != RouteDeliver || !v.Deliverable() {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+	// A corroborated or strong signal still goes to crisis support.
+	for _, a := range []Answers{
+		answers(A{"hazard": hazard(P{"ssh": 0.2}), "s_ssh": noul(0.1)}),
+		answers(A{"s_ssh": noul(0.4)}),
+	} {
+		if v := decideOn(p, SurfaceInput, a); v.Route != RouteCrisisSupport {
+			t.Fatalf("got %s %s", v.Action, v.Route)
+		}
+	}
+}
+
+func TestAWeakUncorroboratedSentinelIsRecordedNotHeld(t *testing.T) {
+	// "How do I report someone I think is doing that?", measured: s_cse 0.06, choice cse 0.
+	v := decideOn(bundled(t), SurfaceInput, answers(A{"s_cse": noul(0.06), "s_prv": noul(0.09)}))
+	if !v.Deliverable() || v.Action != Flag {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+	// Past the block band it still blocks, backed or not.
+	if v := decideOn(bundled(t), SurfaceInput, answers(A{"s_cse": noul(0.2)})); v.Action != Block {
+		t.Fatalf("got %s", v.Action)
+	}
+}
+
+func TestLowConfidenceAloneDoesNotHoldABenignIntent(t *testing.T) {
+	// "Okay, forget all that. What's a good pasta recipe?", measured: pij 0.3 at confidence 0.63.
+	p := bundled(t)
+	benign := answers(A{"hazard": hazard(P{"pij": 0.3}, 0.63), "s_pij": noul(0.28)})
+	if v := decideOn(p, SurfaceInput, benign); !v.Deliverable() || v.HasRule("confidence-gate") {
+		t.Fatalf("got %s %v", v.Action, v.AppliedRules)
+	}
+	// Any other intent still escalates.
+	shady := answers(A{"hazard": hazard(P{"ncr": 0.2}, 0.5), "intent": choice("seeking_information")})
+	if v := decideOn(p, SurfaceInput, shady); !v.HasRule("confidence-gate") {
+		t.Fatalf("got %s %v", v.Action, v.AppliedRules)
+	}
+}
+
+func TestAConversationGoingNowhereIsNotSentToReview(t *testing.T) {
+	p := bundled(t)
+	calm := answers(A{"hazard": hazard(P{"vcr": 0.3}), "escalation": score(0.2)})
+	if v := decideOn(p, SurfaceConversation, calm); Rank(v.Action) >= Rank(Review) {
+		t.Fatalf("got %s", v.Action)
+	}
+	// An escalating one still is, and self-harm is never capped.
+	if v := decideOn(p, SurfaceConversation, answers(A{"hazard": hazard(P{"vcr": 0.3}), "escalation": score(2.0), "actionability": score(2.0)})); Rank(v.Action) < Rank(Review) {
+		t.Fatalf("got %s", v.Action)
+	}
+	if v := decideOn(p, SurfaceConversation, answers(A{"s_ssh": noul(0.5), "escalation": score(0.1)})); v.Route != RouteCrisisSupport {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+	for _, c := range p.ForSurface(SurfaceConversation) {
+		if c.ID == "spc" {
+			t.Fatal("specialised advice is judged per reply, not across a conversation")
+		}
+	}
+}
+
+func TestAnUncorroboratedPersonalDataSentinelIsMaskedNotBlocked(t *testing.T) {
+	p := bundled(t)
+	// "Kính gửi anh Nam, em xin phép nghỉ...", measured: s_prv 0.50, choice prv 0.01.
+	v := decideOn(p, SurfaceOutput, answers(A{"hazard": hazard(P{"prv": 0.01}), "s_prv": noul(0.5), "refusal": noul(0)}))
+	if v.Action != Review || v.Route != RouteRedact || !v.Deliverable() {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+	// A strong or corroborated one still blocks.
+	for _, a := range []Answers{
+		answers(A{"hazard": hazard(P{"prv": 0.01}), "s_prv": noul(0.85), "refusal": noul(0)}),
+		answers(A{"hazard": hazard(P{"prv": 0.3}), "s_prv": noul(0.6), "refusal": noul(0)}),
+	} {
+		if v := decideOn(p, SurfaceOutput, a); v.Action != Block {
+			t.Fatalf("got %s %s", v.Action, v.Route)
+		}
+	}
+	// It is only for categories handled by redaction: cse still blocks.
+	if v := decideOn(p, SurfaceInput, answers(A{"s_cse": noul(0.3)})); v.Action != Block {
+		t.Fatalf("cse got %s", v.Action)
+	}
+}
+
+func TestSelfHarmIsNeverWeakened(t *testing.T) {
+	// A lone self-harm sentinel in the review band still reaches crisis support; a flag-band one
+	// does not replace an ordinary answer.
+	p := bundled(t)
+	if v := decideOn(p, SurfaceInput, answers(A{"s_ssh": noul(0.2)})); v.Route != RouteCrisisSupport {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+	if v := decideOn(p, SurfaceInput, answers(A{"hazard": hazard(P{"ssh": 0.01}, 0.98), "s_ssh": noul(0.07)})); v.Route != RouteDeliver {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+}

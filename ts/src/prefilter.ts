@@ -87,6 +87,7 @@ export function prefilterVerdict(
         refs: category.refs ?? [],
         source: `prefilter:${rule}`,
         notes: [`matched by ${rule}, Jev was not called`],
+        uncorroborated: false,
       },
     ],
     signals: {},

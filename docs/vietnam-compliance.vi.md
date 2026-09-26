@@ -47,7 +47,7 @@ Các nhóm an toàn chung (bạo lực, vũ khí, xâm hại trẻ em, tự hạ
 
 ## Bước 4. Tích hợp vào ứng dụng
 
-Python (`Responder` có trong bản phát hành `python-vietnam-compliance-v1`, branch `guardrail-vietnam-compliance`):
+Python:
 
 ```python
 from guardrail_chatbot_jev import Guard, Responder, detect_language
@@ -137,7 +137,9 @@ Ngưỡng trong policy là con số được chọn, chưa phải con số đo �
 
 ## Bước 8. Con người giám sát
 
-1. Nội dung ở mức `review` cần người xem xét. Bố trí hàng đợi và người xử lý.
+1. Nội dung ở mức `review` cần người xem xét. Bố trí hàng đợi và người xử lý. Trong chat realtime,
+   không ai kịp xem trước khi phải trả lời, nên dùng `review_handling="audit"`: nội dung ở mức
+   `review` vẫn được gửi và đưa vào hàng đợi hậu kiểm, chỉ `block` mới dừng nội dung.
 2. Ghi lại mọi kết quả qua `observer`: mã policy, nhóm vi phạm, rule đã áp dụng. Đếm riêng các kết
    quả `degraded`, vì khi đó guardrail không thực sự kiểm tra gì.
 3. Kiểm tra đầu vào mặc định cho qua khi hệ thống kiểm duyệt gián đoạn; kiểm tra đầu ra mặc định

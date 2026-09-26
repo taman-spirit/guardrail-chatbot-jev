@@ -2,6 +2,7 @@ package guardrail
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 )
@@ -30,7 +31,26 @@ type Options struct {
 	RaiseOnError bool
 	// Timeout is the per-call timeout; zero leaves it to the transport.
 	Timeout time.Duration
+	// Multiturn says how earlier turns may affect a later verdict; see MultiturnMode.
+	Multiturn MultiturnMode
+	// ContextCheck tunes the in-context output check that MultiturnAttribute uses.
+	ContextCheck ContextCheck
+	// ReviewHandling says what a review verdict does to the content; see ReviewAsAudit.
+	ReviewHandling ReviewHandling
 }
+
+// ReviewHandling says what a review verdict does to the content.
+type ReviewHandling int
+
+const (
+	// ReviewHold withholds content at review until a person has looked at it.
+	ReviewHold ReviewHandling = iota
+	// ReviewAsAudit is for realtime chat, where nobody can look before the reply is due: review
+	// delivers the content and queues it for a person afterwards. Only block stops content, and
+	// crisis support still replaces it. A degraded verdict is not affected: when Jev could not be
+	// reached nothing was checked, so a fail-closed surface still holds.
+	ReviewAsAudit
+)
 
 // CheckOptions are per-check details. Fields that do not apply to a check are ignored.
 type CheckOptions struct {
@@ -102,22 +122,55 @@ func (g *Guard) CheckInput(ctx context.Context, content string, opts *CheckOptio
 }
 
 // CheckOutput checks an assistant reply before it reaches the user.
+//
+// In a session with recent risk, a complete reply is also read against the earlier turns, and only
+// a reply that itself completes an earlier harmful request is held for it; see MultiturnAttribute.
 func (g *Guard) CheckOutput(ctx context.Context, reply string, opts *CheckOptions) (Verdict, error) {
 	o := orEmpty(opts)
-	state := OutputState(reply, o.UserMessage, o.Context, mergedMetadata(o.Metadata, o.Session))
+	metadata := mergedMetadata(o.Metadata, o.Session)
+	state := OutputState(reply, o.UserMessage, o.Context, metadata)
 	subset := SubsetFull
 	if o.Quick {
 		subset = SubsetSentinels
 	}
-	return g.run(ctx, SurfaceOutput, state, len(o.Context) > 0, o.Model, o.Session, subset)
+
+	earlier := o.History
+	if len(earlier) == 0 && o.Session != nil {
+		earlier = o.Session.History()
+	}
+	if o.Quick || !g.contextCheckApplies(o.Session, earlier) {
+		return g.run(ctx, SurfaceOutput, state, len(o.Context) > 0, o.Model, o.Session, subset)
+	}
+
+	// Both requests go out together, so the in-context read adds no latency, and the standalone
+	// check never sees the history: its answer stays uncontaminated by what came before.
+	inContext := make(chan contextResult, 1)
+	go func() {
+		inContext <- g.checkInContext(ctx, reply, o.UserMessage, earlier, metadata, o.Model)
+	}()
+	v, err := g.evaluate(ctx, SurfaceOutput, state, len(o.Context) > 0, o.Model, subset)
+	res := <-inContext
+	if err != nil {
+		return Verdict{}, err
+	}
+	return g.finish(g.attribute(v, res), o.Session), nil
 }
 
 // CheckConversation checks a whole conversation for patterns no single turn reveals.
 //
 // Multi-turn jailbreaks look harmless turn by turn: the escalation is the attack. This check
 // reads the transcript as one state, and belongs off the critical path.
+//
+// A transcript with nothing in it but withheld turns is not sent: there is no content to read, and
+// Jev, asked to judge only omissions, answers from what they might have been.
 func (g *Guard) CheckConversation(ctx context.Context, turns []Turn, opts *CheckOptions) (Verdict, error) {
 	o := orEmpty(opts)
+	if !slices.ContainsFunc(turns, func(t Turn) bool { return t.Content != WithheldPlaceholder }) {
+		return g.finish(Verdict{
+			Action: Allow, Surface: SurfaceConversation, Route: RouteDeliver, Confidence: 1,
+			AppliedRules: []string{"nothing-to-read"}, PolicyID: g.Policy.QualifiedID(),
+		}, o.Session), nil
+	}
 	state := ConversationState(turns, mergedMetadata(o.Metadata, o.Session))
 	return g.run(ctx, SurfaceConversation, state, false, o.Model, o.Session, SubsetFull)
 }
@@ -147,7 +200,7 @@ func (g *Guard) CheckTurn(ctx context.Context, userMessage, reply string, opts *
 		history = o.Session.History()
 	}
 	if len(history) > 0 {
-		turns := append(append([]Turn(nil), history...), Turn{"user", userMessage}, Turn{"assistant", reply})
+		turns := append(append([]Turn(nil), history...), Turn{Role: "user", Content: userMessage}, Turn{Role: "assistant", Content: reply})
 		conv, err := g.CheckConversation(ctx, turns, &CheckOptions{Metadata: o.Metadata, Session: o.Session})
 		if err != nil {
 			return verdicts, err
@@ -172,9 +225,18 @@ func (g *Guard) Preview(surface Surface, state State, hasContext bool, subset st
 // -- internals ----------------------------------------------------------------
 
 func (g *Guard) run(ctx context.Context, surface Surface, state State, hasContext bool, model string, session *Session, subset string) (Verdict, error) {
+	v, err := g.evaluate(ctx, surface, state, hasContext, model, subset)
+	if err != nil {
+		return Verdict{}, err
+	}
+	return g.finish(v, session), nil
+}
+
+// evaluate reaches a verdict for one state without touching the session or the observer.
+func (g *Guard) evaluate(ctx context.Context, surface Surface, state State, hasContext bool, model string, subset string) (Verdict, error) {
 	if g.opts.Prefilter != nil {
 		if decided, ok := g.opts.Prefilter.Decide(g.Policy, surface, state); ok {
-			return g.finish(decided, session), nil
+			return decided, nil
 		}
 	}
 
@@ -182,7 +244,7 @@ func (g *Guard) run(ctx context.Context, surface Surface, state State, hasContex
 	if g.opts.Cache != nil && g.cacheSurfaces[surface] {
 		key = CacheKey(g.Policy.QualifiedID(), surface, state, subset, nil)
 		if hit, ok := g.opts.Cache.Get(key); ok {
-			return g.finish(hit, session), nil
+			return hit, nil
 		}
 	}
 
@@ -196,7 +258,7 @@ func (g *Guard) run(ctx context.Context, surface Surface, state State, hasContex
 		if g.opts.RaiseOnError {
 			return Verdict{}, err
 		}
-		return g.finish(ErrorVerdict(g.Policy, surface, err, elapsedMS(started)), session), nil
+		return ErrorVerdict(g.Policy, surface, err, elapsedMS(started)), nil
 	}
 
 	verdict := Decide(g.Policy, surface, reply.Answers, DecideOptions{
@@ -206,7 +268,7 @@ func (g *Guard) run(ctx context.Context, surface Surface, state State, hasContex
 	if key != "" {
 		g.opts.Cache.Put(key, verdict)
 	}
-	return g.finish(verdict, session), nil
+	return verdict, nil
 }
 
 func (g *Guard) call(ctx context.Context, state State, questions Questions, model string) (Reply, error) {
@@ -217,10 +279,12 @@ func (g *Guard) call(ctx context.Context, state State, questions Questions, mode
 	return transport.SystemOne(ctx, state, questions, CallOptions{Model: model, Timeout: g.opts.Timeout})
 }
 
-// finish applies the session floor, tells the session, and emits to the observer.
+// finish applies the session floor (MultiturnFloor only), tells the session, and emits to the
+// observer.
 func (g *Guard) finish(v Verdict, session *Session) Verdict {
+	v = g.audit(v)
 	if session != nil {
-		if floor := session.Floor(); floor != Allow {
+		if floor := session.Floor(); floor != Allow && g.opts.Multiturn == MultiturnFloor {
 			id := session.ID
 			if id == "" {
 				id = "unnamed"
@@ -231,6 +295,20 @@ func (g *Guard) finish(v Verdict, session *Session) Verdict {
 	}
 	if g.opts.Observer != nil {
 		g.opts.Observer(v)
+	}
+	return v
+}
+
+// audit marks what a person should look at later, and under ReviewAsAudit lets a review through.
+func (g *Guard) audit(v Verdict) Verdict {
+	switch {
+	case Rank(v.Action) >= Rank(Review):
+		v.Audit = "priority"
+	case v.Action == Flag:
+		v.Audit = "sample"
+	}
+	if g.opts.ReviewHandling == ReviewAsAudit && v.Route == RouteHumanReview && !v.Degraded {
+		v.Route = RouteDeliverAndAudit
 	}
 	return v
 }

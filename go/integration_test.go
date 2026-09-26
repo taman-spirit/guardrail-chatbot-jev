@@ -204,9 +204,17 @@ func TestAFlaggedConversationRaisesTheFloorForLaterTurns(t *testing.T) {
 	if session.Floor() != Review {
 		t.Fatalf("floor=%s", session.Floor())
 	}
-	v, _ := New(Options{Policy: p, Transport: NewRecordedTransport(clean)}).CheckInput(ctx, "một câu hỏi bình thường", &CheckOptions{Session: session})
+	// The earlier behaviour, kept as MultiturnFloor: a clean turn inside an escalating
+	// conversation is held too.
+	legacy := New(Options{Policy: p, Transport: NewRecordedTransport(clean), Multiturn: MultiturnFloor})
+	v, _ := legacy.CheckInput(ctx, "một câu hỏi bình thường", &CheckOptions{Session: session})
 	if v.Action != Review || !strings.HasPrefix(v.AppliedRules[len(v.AppliedRules)-1], "session-floor") {
-		t.Fatalf("a clean turn inside an escalating conversation still holds: %+v", v)
+		t.Fatalf("MultiturnFloor holds a clean turn inside an escalating conversation: %+v", v)
+	}
+	// The default: the past never holds a clean turn by itself.
+	v, _ = New(Options{Policy: p, Transport: NewRecordedTransport(clean)}).CheckInput(ctx, "một câu hỏi bình thường", &CheckOptions{Session: session})
+	if v.Action != Allow || !v.Deliverable() {
+		t.Fatalf("MultiturnAttribute must not hold a clean turn for its history: %+v", v)
 	}
 }
 
@@ -273,7 +281,7 @@ func TestASessionSurvivesARoundTripThroughAStore(t *testing.T) {
 	if fmt.Sprint(restored.History()) != fmt.Sprint(session.History()) {
 		t.Fatal("transcript lost")
 	}
-	v, _ := New(Options{Policy: p, Transport: NewRecordedTransport(clean)}).CheckInput(ctx, "một câu hỏi bình thường", &CheckOptions{Session: restored})
+	v, _ := New(Options{Policy: p, Transport: NewRecordedTransport(clean), Multiturn: MultiturnFloor}).CheckInput(ctx, "một câu hỏi bình thường", &CheckOptions{Session: restored})
 	if v.Action != Review {
 		t.Fatalf("got %+v", v)
 	}
@@ -531,8 +539,11 @@ func TestRoundingMatchesPython(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		s.Observe(Verdict{Action: Allow, Surface: SurfaceInput})
 	}
-	if got := s.Metadata()["session_risk"]; got != 0.062 {
-		t.Fatalf("session_risk = %v, want Python's 0.062", got)
+	if got := s.Summary()["risk"]; got != 0.062 {
+		t.Fatalf("risk = %v, want Python's 0.062", got)
+	}
+	if _, sent := s.Metadata()["session_risk"]; sent {
+		t.Fatal("the session's risk must not be put in front of Jev")
 	}
 }
 
