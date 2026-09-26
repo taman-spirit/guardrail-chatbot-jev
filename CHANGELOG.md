@@ -3,6 +3,16 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Python Viet Nam compliance 1.2.1] - 2026-09-26
+
+### Documentation
+
+- README, Definitions: a table of the settings in use and of every category's thresholds, including
+  the `vietnam-compliance-v1` categories; the rules and the single-turn calibration explained in
+  words before the formulas; each formula block followed by links to the code. In English,
+  Vietnamese, French and Japanese.
+- README, Releases: the demo at https://nhatnguyet.org/tro-ly-ai.
+
 ## [Python Viet Nam compliance 1.2.0] - 2026-09-26
 
 ### Changed
