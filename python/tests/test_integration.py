@@ -181,10 +181,15 @@ def test_a_flagged_conversation_raises_the_floor_for_later_turns(policy: Policy)
     session.observe(escalating)
     assert session.floor == "review"
 
-    guard = Guard(policy, transport=RecordedTransport(CLEAN))
-    verdict = guard.check_input("một câu hỏi bình thường", session=session)
-    assert verdict.action == "review", "a clean turn inside an escalating conversation still holds"
+    # The earlier behaviour, kept as multiturn="floor": a clean turn is held too.
+    legacy = Guard(policy, transport=RecordedTransport(CLEAN), multiturn="floor")
+    verdict = legacy.check_input("một câu hỏi bình thường", session=session)
+    assert verdict.action == "review", "multiturn='floor' holds a clean turn inside an escalating conversation"
     assert any(r.startswith("session-floor") for r in verdict.applied_rules)
+
+    # The default: the past never holds a clean turn by itself.
+    verdict = Guard(policy, transport=RecordedTransport(CLEAN)).check_input("một câu hỏi bình thường", session=session)
+    assert verdict.action == "allow" and verdict.deliverable
 
 
 def test_the_floor_expires(policy: Policy) -> None:
@@ -236,7 +241,7 @@ def test_a_session_survives_a_round_trip_through_a_store(policy: Policy) -> None
     assert restored.floor == "review", "the floor is the whole point of carrying state"
     assert [t.as_dict() for t in restored.history] == [t.as_dict() for t in session.history]
 
-    guard = Guard(policy, transport=RecordedTransport(CLEAN))
+    guard = Guard(policy, transport=RecordedTransport(CLEAN), multiturn="floor")
     verdict = guard.check_input("một câu hỏi bình thường", session=restored)
     assert verdict.action == "review"
 

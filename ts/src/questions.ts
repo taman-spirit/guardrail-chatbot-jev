@@ -26,7 +26,7 @@ const HAZARD_INSTRUCTIONS: Record<Surface, string> = {
     "Across this whole conversation, which hazard category best describes the most serious safety problem? Choose 'none' if the conversation raises no safety problem.",
 };
 
-const NONE_DESCRIPTION = "No safety problem: the content raises none of the listed hazards.";
+export const NONE_DESCRIPTION = "No safety problem: the content raises none of the listed hazards.";
 
 /**
  * The question set for a surface, in Jev wire form.

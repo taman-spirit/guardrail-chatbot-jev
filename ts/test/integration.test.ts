@@ -175,10 +175,20 @@ test("a flagged conversation raises the floor for later turns", async () => {
   );
   assert.equal(session.floor, "review");
 
-  const guard = new Guard({ policy, transport: new RecordedTransport(CLEAN) });
-  const verdict = await guard.checkInput("một câu hỏi bình thường", { session });
-  assert.equal(verdict.action, "review", "a clean turn inside an escalating conversation still holds");
-  assert.ok(verdict.appliedRules.some((r) => r.startsWith("session-floor")));
+  // The earlier behaviour, kept as the "floor" mode: a clean turn inside an escalating
+  // conversation is held too.
+  const legacy = new Guard({ policy, transport: new RecordedTransport(CLEAN), multiturn: "floor" });
+  const verdict = await legacy.checkInput("một câu hỏi bình thường", { session });
+  assert.equal(verdict.action, "review", "the floor mode holds a clean turn inside an escalating conversation");
+  assert.ok(verdict.appliedRules.at(-1)?.startsWith("session-floor"));
+
+  // The default: the past never holds a clean turn by itself.
+  const current = await new Guard({ policy, transport: new RecordedTransport(CLEAN) }).checkInput(
+    "một câu hỏi bình thường",
+    { session },
+  );
+  assert.equal(current.action, "allow");
+  assert.ok(current.deliverable);
 });
 
 test("the floor expires", () => {
@@ -224,7 +234,7 @@ test("a session survives a round trip through a store", async () => {
   assert.equal(restored.floor, "review", "the floor is the whole point of carrying state");
   assert.deepEqual(restored.history, session.history);
 
-  const guard = new Guard({ policy, transport: new RecordedTransport(CLEAN) });
+  const guard = new Guard({ policy, transport: new RecordedTransport(CLEAN), multiturn: "floor" });
   const verdict = await guard.checkInput("một câu hỏi bình thường", { session: restored });
   assert.equal(verdict.action, "review");
 

@@ -10,7 +10,7 @@ import time
 from dataclasses import replace
 from typing import Any, Mapping
 
-from .policy import Category, Policy
+from .policy import Category, Policy, SentinelCorroboration
 from .questions import HAZARD, NONE_LABEL, SENTINEL_PREFIX
 from .types import (
     Action,
@@ -41,6 +41,8 @@ def decide(
     """Turn one set of Jev answers into a verdict."""
     signals = _read_signals(policy, answers)
     probabilities, confidences, sentinel_sourced = _hazard_probabilities(policy, surface, answers)
+    corroboration = policy.sentinel_corroboration()
+    choice = (answers.get(HAZARD) or {}).get("probabilities") or {}
 
     findings = [
         f
@@ -52,11 +54,26 @@ def decide(
                 probabilities.get(cat.id, 0.0),
                 confidences.get(cat.id, 1.0),
                 sentinel=cat.id in sentinel_sourced,
+                uncorroborated=corroboration is not None
+                and cat.id in sentinel_sourced
+                and _num(choice.get(cat.id)) < corroboration.min_choice,
             )
         )
     ]
 
     findings, floors, applied = _apply_rules(policy, surface, findings, signals, probabilities)
+    if corroboration is not None:
+        if surface == "output":
+            findings = _cap_uncorroborated_on_refusal(findings, signals, corroboration)
+        if corroboration.redact_instead_of_block_below > 0:
+            findings = [_redact_instead_of_block(policy, f, corroboration) for f in findings]
+        if corroboration.weak_at_most_flag:
+            findings = [
+                replace(f, action="flag", notes=f.notes + (f"uncorroborated sentinel below its block band: {f.action} -> flag",))
+                if f.weak and rank(f.action) > rank("flag")
+                else f
+                for f in findings
+            ]
 
     action: Action = "allow"
     for finding in findings:
@@ -72,7 +89,10 @@ def decide(
         for rule in policy.rules
     )
     if not gate_off:
-        action, escalated = _confidence_gate(policy, action, confidence, findings, probabilities, surface)
+        action, escalated = _confidence_gate(
+            policy, action, confidence, findings, probabilities, surface, choice, signals,
+            corroboration.min_choice if corroboration is not None else 0.0,
+        )
         if escalated:
             applied.append("confidence-gate")
 
@@ -177,6 +197,7 @@ def _finding(
     confidence: float,
     *,
     sentinel: bool = False,
+    uncorroborated: bool = False,
 ) -> Finding | None:
     bands = cat.threshold(surface)
     if not bands:
@@ -193,7 +214,12 @@ def _finding(
     notes: list[str] = []
     if cat.route in _CATEGORY_ROUTES:
         notes.append(f"handled by {cat.route}")
-    if cat.never_below:
+    # A sentinel alone, which the hazard choice does not back, answers at its own band: it may still
+    # reach block by crossing the block band, but never_below does not lift it there.
+    weak = uncorroborated and probability < bands["block"]
+    if cat.never_below and weak:
+        notes.append(f"uncorroborated sentinel: never below {cat.never_below} not applied")
+    elif cat.never_below:
         action = stronger(action, cat.never_below)
         notes.append(f"never below {cat.never_below}")
 
@@ -207,7 +233,54 @@ def _finding(
         refs=cat.refs,
         source="sentinel" if sentinel else "category",
         notes=tuple(notes),
+        uncorroborated=uncorroborated,
+        weak=weak,
     )
+
+
+def _num(value: Any) -> float:
+    try:
+        return float(value or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _cap_uncorroborated_on_refusal(
+    findings: list[Finding], signals: Mapping[str, Any], c: SentinelCorroboration
+) -> list[Finding]:
+    """Lower to flag an uncorroborated sentinel finding on a reply that declines.
+
+    Measured against Jev, a plain refusal drew sentinel answers of up to 0.26 for categories the
+    reply never touched, while the hazard choice gave them nothing. The categories a refusal can
+    still leak, such as a system prompt or personal data, are exempt.
+    """
+    refusal = signals.get("refusal")
+    if not isinstance(refusal, float) or refusal < c.refusal:
+        return findings
+    out = []
+    for f in findings:
+        if (
+            f.uncorroborated
+            and f.probability < c.refusal_max_sentinel
+            and f.category not in c.refusal_except
+            and rank(f.action) > rank("flag")
+        ):
+            f = replace(f, action="flag", notes=f.notes + (f"refusal with an uncorroborated sentinel: {f.action} -> flag",))
+        out.append(f)
+    return out
+
+
+def _redact_instead_of_block(policy: Policy, f: Finding, c: SentinelCorroboration) -> Finding:
+    """Personal data is handled by masking it; blocking a whole reply on a sentinel alone is the
+    wrong remedy. Measured: a reply naming "anh Nam" drew s_prv up to 0.50 with the choice at 0.01."""
+    if (
+        f.uncorroborated
+        and f.action == "block"
+        and f.probability < c.redact_instead_of_block_below
+        and policy.categories[f.category].route == "redact"
+    ):
+        return replace(f, action="review", notes=f.notes + ("uncorroborated sentinel on a redacted category: block -> review",))
+    return f
 
 
 def _matches(op: str, value: Any, target: Any) -> bool:
@@ -287,21 +360,11 @@ def _adjust(finding: Finding, steps: int, cap: str | None, rule_id: str, policy:
     if cap:
         action = weaker(action, cap)
     never_below = policy.categories[finding.category].never_below
-    if never_below:
+    if never_below and not finding.weak:
         action = stronger(action, never_below)
     if action == finding.action:
         return finding
-    return Finding(
-        category=finding.category,
-        name=finding.name,
-        probability=finding.probability,
-        confidence=finding.confidence,
-        action=action,
-        severity=finding.severity,
-        refs=finding.refs,
-        source=finding.source,
-        notes=finding.notes + (f"{rule_id}: {finding.action} -> {action}",),
-    )
+    return replace(finding, action=action, notes=finding.notes + (f"{rule_id}: {finding.action} -> {action}",))
 
 
 def _overall_confidence(
@@ -322,10 +385,22 @@ def _confidence_gate(
     findings: list[Finding],
     probabilities: Mapping[str, float],
     surface: Surface,
+    choice: Mapping[str, Any] | None = None,
+    signals: Mapping[str, Any] | None = None,
+    min_choice: float = 0.0,
 ) -> tuple[Action, bool]:
     """A low-confidence answer is not evidence of safety, so it escalates toward review."""
     if confidence >= policy.min_confidence() or policy.on_low_confidence() != "escalate":
         return action, False
+    opts = policy.confidence_gate()
+    intent = (signals or {}).get("intent")
+    if isinstance(intent, str) and intent in opts.skip_when_intent and confidence >= opts.skip_min_confidence:
+        return action, False
+    if opts.needs_corroboration:
+        # Only what the hazard choice backs counts: a sentinel on its own is already answered at
+        # its own band, and is not a reason to hold on top of that.
+        findings = [f for f in findings if not f.uncorroborated]
+        probabilities = {cid: p for cid, p in probabilities.items() if _num((choice or {}).get(cid)) >= min_choice}
     near_miss = any(
         probability >= (policy.categories[cid].threshold(surface).get("flag", 1.0) * 0.5)
         for cid, probability in probabilities.items()
@@ -343,13 +418,16 @@ def _route(policy: Policy, findings: list[Finding], action: Action) -> Route:
 
     The action says whether the content goes out; the route says what to do about it.
     """
-    # Only a finding that still counts sets the handling: one a rule capped to allow is a record,
-    # not a reason to redact.
+    # Only a finding that still counts sets the handling. One a rule capped to allow is a record, and
+    # a sentinel the hazard choice does not back, still at flag, must not replace an ordinary answer
+    # with a crisis message.
     hazard_route = next(
         (
             policy.categories[f.category].route
             for f in findings
-            if rank(f.action) >= rank("flag") and policy.categories[f.category].route in _CATEGORY_ROUTES
+            if rank(f.action) >= rank("flag")
+            and not (f.uncorroborated and f.action == "flag")
+            and policy.categories[f.category].route in _CATEGORY_ROUTES
         ),
         None,
     )

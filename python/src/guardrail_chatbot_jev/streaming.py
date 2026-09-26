@@ -60,6 +60,19 @@ async def guard_stream(
     Yields:
         ``StreamEvent``s. Stop consuming on ``blocked``; ``done`` is always last unless blocked.
     """
+    # Mid-stream checks read each chunk on its own. In a watched session a part that is harmful only in
+    # the light of earlier turns would get past them, so the reply is held whole for the final check,
+    # which reads it in context.
+    context_check = getattr(guard, "context_check", None)
+    if (
+        getattr(guard, "multiturn", "floor") == "attribute"
+        and context_check is not None
+        and not context_check.never
+        and session is not None
+        and (context_check.always or session.watching(context_check.watch_risk or 0.2))
+    ):
+        chunk_chars = 2**31 - 1
+
     queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=64)
     failure: list[BaseException] = []
 

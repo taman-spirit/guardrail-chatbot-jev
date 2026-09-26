@@ -3,21 +3,47 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, AsyncIterator, Callable, Mapping, Sequence
 
 from .cache import VerdictCache, cache_key
 from .client import Transport, auto_transport
-from .decide import decide, error_verdict, now_ms, with_floor
+from .decide import _route, decide, error_verdict, now_ms, with_floor
 from .policy import Policy
 from .prefilter import Prefilter
-from .questions import build_questions, conversation_state, input_state, output_state
-from .session import Session
+from .questions import (
+    CONTEXT_COMPLETES,
+    CONTEXT_DISENGAGES,
+    build_questions,
+    context_questions,
+    conversation_state,
+    input_state,
+    output_in_context_state,
+    output_state,
+)
+from .session import WITHHELD_PLACEHOLDER, Session
 from .streaming import StreamEvent, guard_stream
-from .types import GuardrailError, Surface, Turn, Verdict, as_turns
+from .types import GuardrailError, Surface, Turn, Verdict, as_turns, rank, stronger
 
 #: Conversation state changes every turn, so caching it buys nothing and only costs memory.
 DEFAULT_CACHE_SURFACES: frozenset[str] = frozenset({"input", "output"})
+
+
+@dataclass(frozen=True, slots=True)
+class ContextCheck:
+    """Tunes the in-context output check that ``multiturn="attribute"`` uses.
+
+    ``watch_risk`` is the session risk from which replies are also read in context; ``attribution``
+    is how sure Jev must be that the reply completes an earlier harmful request before the in-context
+    findings count.
+    """
+
+    always: bool = False
+    never: bool = False
+    watch_risk: float = 0.2
+    attribution: float = 0.5
 
 
 class Guard:
@@ -55,6 +81,9 @@ class Guard:
         observer: Callable[[Verdict], None] | None = None,
         raise_on_error: bool = False,
         timeout: float | None = None,
+        multiturn: str = "attribute",
+        context_check: ContextCheck | None = None,
+        review_handling: str = "hold",
         **transport_kwargs: Any,
     ) -> None:
         self.policy = policy if isinstance(policy, Policy) else Policy.load(policy)
@@ -66,6 +95,17 @@ class Guard:
         self.observer = observer
         self.raise_on_error = raise_on_error
         self.timeout = timeout
+        if multiturn not in ("attribute", "floor"):
+            raise ValueError("multiturn must be 'attribute' or 'floor'")
+        if review_handling not in ("hold", "audit"):
+            raise ValueError("review_handling must be 'hold' or 'audit'")
+        #: "attribute" holds a turn only for what it or its reply does; "floor" is the earlier
+        #: behaviour, which raised every later turn to a floor after a conversation-level review.
+        self.multiturn = multiturn
+        self.context_check = context_check or ContextCheck()
+        #: "audit" is for realtime chat: a review verdict delivers and is queued for a person.
+        self.review_handling = review_handling
+        self._pool: ThreadPoolExecutor | None = None
 
     @property
     def transport(self) -> Transport:
@@ -98,6 +138,7 @@ class Guard:
         model: str | None = None,
         session: Session | None = None,
         quick: bool = False,
+        history: Sequence[Any] | None = None,
     ) -> Verdict:
         """Check an assistant reply before it reaches the user.
 
@@ -106,21 +147,25 @@ class Guard:
 
         ``quick=True`` asks only the sentinel questions. It is what mid-stream checks use on
         incomplete text; a complete reply should get the full set.
+
+        In a watched session the complete reply is also read against the earlier turns (``history``,
+        or the session's), in a second request sent alongside the first. Those findings count only
+        when the reply itself completes an earlier harmful request; see ``multiturn``.
         """
-        state = output_state(
-            reply,
-            user_message=user_message,
-            context=context,
-            metadata=_metadata(metadata, session),
-        )
-        return self._run(
-            "output",
-            state,
-            has_context=bool(context),
-            model=model,
-            session=session,
-            subset="sentinels" if quick else "full",
-        )
+        meta = _metadata(metadata, session)
+        state = output_state(reply, user_message=user_message, context=context, metadata=meta)
+        subset = "sentinels" if quick else "full"
+        earlier = as_turns(history) if history else (session.history if session is not None else ())
+        if quick or not self._context_check_applies(session, earlier):
+            return self._run("output", state, has_context=bool(context), model=model, session=session, subset=subset)
+
+        # Both requests go out together, so the in-context read adds no latency, and the standalone
+        # check never sees the history: its answer stays uncontaminated by what came before.
+        if self._pool is None:
+            self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="guardrail-context")
+        in_context = self._pool.submit(self._check_in_context, reply, user_message, earlier, meta, model)
+        verdict = self._evaluate("output", state, has_context=bool(context), model=model, subset=subset)
+        return self._finish(self._attribute(verdict, in_context.result()), session)
 
     def check_conversation(
         self,
@@ -134,8 +179,18 @@ class Guard:
 
         Multi-turn jailbreaks look harmless turn by turn: the escalation is the attack. This
         check reads the transcript as one state, and belongs off the critical path.
+
+        A transcript with nothing in it but withheld turns is not sent: there is no content to read,
+        and Jev, asked to judge only omissions, answers from what they might have been.
         """
-        state = conversation_state(as_turns(turns), metadata=_metadata(metadata, session))
+        parsed = as_turns(turns)
+        if all(t.content == WITHHELD_PLACEHOLDER for t in parsed):
+            nothing = Verdict(
+                action="allow", surface="conversation", route="deliver", confidence=1.0,
+                applied_rules=("nothing-to-read",), policy_id=f"{self.policy.id}@{self.policy.version}",
+            )
+            return self._finish(nothing, session)
+        state = conversation_state(parsed, metadata=_metadata(metadata, session))
         return self._run("conversation", state, model=model, session=session)
 
     def check_turn(
@@ -206,17 +261,30 @@ class Guard:
         session: Session | None = None,
         subset: str = "full",
     ) -> Verdict:
+        verdict = self._evaluate(surface, state, has_context=has_context, model=model, subset=subset)
+        return self._finish(verdict, session)
+
+    def _evaluate(
+        self,
+        surface: Surface,
+        state: Any,
+        *,
+        has_context: bool = False,
+        model: str | None = None,
+        subset: str = "full",
+    ) -> Verdict:
+        """Reach a verdict for one state without touching the session or the observer."""
         if self.prefilter is not None:
             decided = self.prefilter(self.policy, surface, state)
             if decided is not None:
-                return self._finish(decided, session)
+                return decided
 
         key: str | None = None
         if self.cache is not None and surface in self.cache_surfaces:
             key = cache_key(f"{self.policy.id}@{self.policy.version}", surface, state, subset)
             hit = self.cache.get(key)
             if hit is not None:
-                return self._finish(hit, session)
+                return hit
 
         questions = build_questions(self.policy, surface, has_context=has_context, subset=subset)
         started = now_ms()
@@ -227,9 +295,7 @@ class Guard:
         except GuardrailError as exc:
             if self.raise_on_error:
                 raise
-            return self._finish(
-                error_verdict(self.policy, surface, exc, latency_ms=now_ms() - started), session
-            )
+            return error_verdict(self.policy, surface, exc, latency_ms=now_ms() - started)
 
         verdict = decide(
             self.policy,
@@ -243,13 +309,92 @@ class Guard:
             verdict = _mark_partial(verdict)
         if key is not None and self.cache is not None:
             self.cache.put(key, verdict)
-        return self._finish(verdict, session)
+        return verdict
+
+    def _audit(self, verdict: Verdict) -> Verdict:
+        """Mark what a person should look at later; under review_handling="audit", let a review
+        through. A degraded verdict keeps its route: when Jev could not be reached nothing was
+        checked, so a fail-closed surface still holds."""
+        route = verdict.route
+        if self.review_handling == "audit" and route == "human_review" and not verdict.degraded:
+            route = "deliver_and_audit"
+        return replace(verdict, audit=_audit_level(verdict), route=route)
+
+    # -- multi-turn -----------------------------------------------------
+
+    def _context_check_applies(self, session: Session | None, earlier: Sequence[Turn]) -> bool:
+        c = self.context_check
+        if c.never or self.multiturn == "floor" or not earlier:
+            return False
+        if c.always:
+            return True
+        return session is not None and session.watching(c.watch_risk if c.watch_risk > 0 else 0.2)
+
+    def _check_in_context(
+        self, reply: str, user_message: str | None, earlier: Sequence[Turn], metadata: Any, model: str | None
+    ) -> tuple[Verdict | None, float, float, Exception | None]:
+        try:
+            answers, used_model, usage = self.transport.system_one(
+                output_in_context_state(reply, user_message=user_message, earlier=earlier, metadata=metadata),
+                context_questions(self.policy),
+                model=model,
+                timeout=self.timeout,
+            )
+        except GuardrailError as exc:
+            return None, 0.0, 0.0, exc
+        verdict = decide(self.policy, "output", answers, model=used_model, usage=usage)
+        completes = float((answers.get(CONTEXT_COMPLETES) or {}).get("noul", 0.0) or 0.0)
+        disengages = float((answers.get(CONTEXT_DISENGAGES) or {}).get("noul", 0.0) or 0.0)
+        return verdict, completes, disengages, None
+
+    def _attribute(self, v: Verdict, result: tuple[Verdict | None, float, float, Exception | None]) -> Verdict:
+        """Merge the in-context findings into the standalone verdict, but only when the reply itself
+        completes an earlier harmful request. Otherwise they are recorded and change nothing."""
+        ctx_verdict, completes, disengages, err = result
+        read: dict[str, Any] = {"ran": True, "attributed": False, "completes": completes, "disengages": disengages, "categories": []}
+        if err is not None or ctx_verdict is None:
+            # The standalone check still stands; an outage of the second read is not evidence.
+            read["error"] = str(err)
+            return replace(v, context=read, applied_rules=v.applied_rules + ("context-unavailable",))
+        fired = [f for f in ctx_verdict.findings if rank(f.action) >= rank("flag")]
+        read["categories"] = [f.category for f in fired]
+        threshold = self.context_check.attribution if self.context_check.attribution > 0 else 0.5
+        read["attributed"] = bool(fired) and completes >= threshold and completes >= disengages
+        if not fired:
+            return replace(v, context=read)
+        if not read["attributed"]:
+            return replace(v, context=read, applied_rules=v.applied_rules + ("context-not-attributed",))
+
+        findings = list(v.findings)
+        for f in fired:
+            f = replace(f, source="context:" + f.source, notes=f.notes + ("completes an earlier request",))
+            same = next((i for i, x in enumerate(findings) if x.category == f.category), None)
+            if same is not None:
+                if rank(f.action) > rank(findings[same].action):
+                    findings[same] = f
+                continue
+            findings.append(f)
+        findings.sort(key=lambda f: (-rank(f.action), -f.probability))
+        action = v.action
+        for f in findings:
+            action = stronger(action, f.action)
+        return replace(
+            v,
+            findings=tuple(findings),
+            action=action,
+            route=_route(self.policy, findings, action),
+            severity=max(v.severity, ctx_verdict.severity),
+            applied_rules=v.applied_rules + ("context-attributed",),
+            context=read,
+        )
 
     def _finish(self, verdict: Verdict, session: Session | None) -> Verdict:
-        """Apply the session floor, tell the session, and emit to the observer."""
+        """Mark the audit level, apply the session floor ("floor" mode only), tell the session, and
+        emit to the observer."""
+        verdict = self._audit(verdict)
         if session is not None:
             floor = session.floor
-            if floor != "allow":
+            if floor != "allow" and self.multiturn == "floor":
                 verdict = with_floor(
                     self.policy, verdict, floor, note=f"session-floor:{session.id or 'unnamed'}"
                 )
@@ -257,6 +402,12 @@ class Guard:
         if self.observer is not None:
             self.observer(verdict)
         return verdict
+
+
+def _audit_level(verdict: Verdict) -> str | None:
+    if rank(verdict.action) >= rank("review"):
+        return "priority"
+    return "sample" if verdict.action == "flag" else None
 
 
 def _metadata(

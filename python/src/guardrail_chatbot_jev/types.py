@@ -7,7 +7,7 @@ from typing import Any, Literal, Mapping, Sequence
 
 Action = Literal["allow", "flag", "review", "block"]
 Surface = Literal["input", "output", "conversation"]
-Route = Literal["deliver", "redact", "guide", "crisis_support", "human_review", "safe_response"]
+Route = Literal["deliver", "redact", "guide", "crisis_support", "human_review", "safe_response", "deliver_and_audit"]
 
 #: Routes that withhold the content and put something else in its place.
 WITHHOLDING_ROUTES: frozenset[str] = frozenset({"safe_response", "crisis_support", "human_review"})
@@ -57,6 +57,10 @@ class Finding:
     refs: tuple[str, ...] = ()
     source: str = "category"
     notes: tuple[str, ...] = ()
+    #: Raised by a sentinel alone while the hazard choice gave its category next to nothing.
+    uncorroborated: bool = False
+    #: Uncorroborated and below its block band: never_below does not lift it.
+    weak: bool = False
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -105,6 +109,10 @@ class Verdict:
     partial: bool = False
     #: Set when a prefilter decided without calling Jev.
     prefilter: str | None = None
+    #: What the in-context output check found, when it ran.
+    context: Mapping[str, Any] | None = None
+    #: "priority" for review or worse, "sample" for a flag: what a person should look at later.
+    audit: str | None = None
 
     @property
     def allowed(self) -> bool:
@@ -152,6 +160,8 @@ class Verdict:
             "partial": self.partial,
             "prefilter": self.prefilter,
             "error": self.error,
+            "context": dict(self.context) if self.context is not None else None,
+            "audit": self.audit,
         }
 
 

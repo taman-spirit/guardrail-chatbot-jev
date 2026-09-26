@@ -53,7 +53,10 @@ def test_policy_copies_stay_in_sync() -> None:
         for copy in (
             ROOT / "python" / "src" / "guardrail_chatbot_jev" / "policies" / pack.name,
             ROOT / "ts" / "src" / "policies" / pack.name,
+            ROOT / "go" / "policies" / pack.name,
         ):
+            if copy.parts[-3] == "go" and not (ROOT / "go").exists():
+                continue  # the Go module lives on its own branches
             assert json.loads(copy.read_text("utf-8")) == canonical, f"{copy} drifted; run scripts/sync-policies.sh"
 
 
