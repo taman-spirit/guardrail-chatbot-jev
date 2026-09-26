@@ -395,7 +395,7 @@ confidence gate:  conf < 0.65 ∧ (finding ∨ p ≥ θ_flag / 2) → review,  u
 conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
 ```
 
-コード：`u_k` [`decide`](python/src/guardrail_chatbot_jev/decide.py#L57), `never_below` [`_finding`](python/src/guardrail_chatbot_jev/decide.py#L212), weak [`decide`](python/src/guardrail_chatbot_jev/decide.py#L70), refusal [`_cap_uncorroborated_on_refusal`](python/src/guardrail_chatbot_jev/decide.py#L241), redact [`_redact_instead_of_block`](python/src/guardrail_chatbot_jev/decide.py#L266), gate [`_confidence_gate`](python/src/guardrail_chatbot_jev/decide.py#L374), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
+コード：`u_k` [`decide`](python/src/guardrail_chatbot_jev/decide.py#L57), `never_below` [`_finding`](python/src/guardrail_chatbot_jev/decide.py#L219), weak [`decide`](python/src/guardrail_chatbot_jev/decide.py#L70), refusal [`_cap_uncorroborated_on_refusal`](python/src/guardrail_chatbot_jev/decide.py#L248), redact [`_redact_instead_of_block`](python/src/guardrail_chatbot_jev/decide.py#L273), gate [`_confidence_gate`](python/src/guardrail_chatbot_jev/decide.py#L381), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L700), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L32), [`spc`](policies/standard-v1.json#L328), [`ncr`](policies/standard-v1.json#L207), [`iwp`](policies/standard-v1.json#L83)
 
 ### リアルタイムでのレビュー
 
