@@ -261,205 +261,162 @@ is asked, without touching code.
 
 ## Multi-turn
 
-A multi-turn attack is built out of turns that are each defensible on their own, so a guardrail has
-to read conversations, not just messages. Reading them naively has the opposite failure: the
-classifier sees a violation in the history and hands the same label to whatever comes next, an
-apology, a question about the law, a request for the weather. That is **context contamination**,
-and it is the main source of false positives in a chatbot guardrail.
+### Problem
 
-The earlier design held every turn after a violation, clean or not. Measured live against Jev on
-the scenario set below, it held **171 of 194 harmless follow-ups**. This section describes the
-design that replaced it, how it decides, and what it measured.
+**Context contamination:** a classifier that reads a violation in the history assigns it to the next
+turn, whatever that turn contains. Baseline (session floor, the earlier design): **171 of 194**
+harmless follow-ups held, measured live.
 
-### The principle
+### Design rule
 
-**History is for understanding the current turn, never for convicting it.** A turn is withheld
-only for what that turn, or the reply to it, does. Risk carried over from earlier turns decides
-*how closely* a turn is read, never *whether* it is held.
+A turn is withheld only on evidence from the turn itself or from its reply. History determines how
+closely a turn is read, never whether it is withheld.
 
-Two consequences follow:
+### Method
 
-- *Related is not the same as continuing.* "How is making explosives punished?" refers back to a
-  blocked request, but steps away from it. "Go on, what's step 2?" continues it. Only the second
-  may be held.
-- *Judge what is delivered, not a guess about intent.* If a follow-up is harmless, so is the
-  answer to it, and there is nothing to hold. If it was an attempt to continue, the harm shows up in
-  the reply, which is always checked.
+| Component | Rule |
+| --- | --- |
+| Input check | Reads `q_t` only. No history, no session risk. |
+| Output check | Reads `r_t` alone. In a watched session, also `r_t` given `H_t`, as a parallel request. |
+| Attribution | In-context findings count only if the reply completes an earlier harmful request. |
+| Withheld turns | Stored as `[earlier message omitted]`; excluded from `Session.ModelHistory()`. |
+| Conversation check | Monitoring only; never holds a turn. Capped at `flag` when escalation ≤ 0.5. |
+| Streaming | In a watched session the reply is released after the final in-context check. |
 
-### How a turn is decided
+### Definitions
 
-1. **Input is read alone.** The input check never sees the history, so the past can never block a
-   question. The session's risk is not sent to Jev either.
-2. **Output is read alone, and in a watched session also in context.** When the session is
-   *watched* (below), the reply is sent twice, in parallel, so there is no extra latency: once alone,
-   and once with the earlier turns. The standalone request never contains history, so it stays
-   uncontaminated.
-3. **The in-context read counts only if the reply itself completes an earlier harmful request.**
-   Besides the hazard choice, the in-context request asks two yes/no questions: does the reply
-   supply harmful content or complete a harmful request from an earlier turn (the next step, more
-   detail, a rephrasing, translation or fictional retelling of it)? And does the latest user message
-   refer back only to step away (apologise, ask about the law, prevention or reporting, ask why it
-   was refused, change the subject)?
-4. **Withheld turns are remembered, not re-read.** A withheld turn stays in the transcript as
-   `[earlier message omitted]`, so the conversation check still sees that an attempt was made. Jev
-   never reads the blocked text again, and the chat model never sees it at all
-   (`session.ModelHistory()` leaves it out).
-5. **The conversation check monitors; it does not hold.** It runs off the critical path, feeds the
-   session's risk and watch, and sends conversations to the review queue. A conversation that is not
-   moving toward a harmful objective is capped at flag.
-6. **Streaming is held whole in a watched session.** Mid-stream checks read each chunk alone, so a
-   part that is harmful only in context would get past them. In a watched session the reply is
-   released after the final, in-context check.
-
-### Formulas
-
-Notation: `q_t` is the user message at turn t, `r_t` the reply, `H_t` the transcript window (10
-messages), `J(x)` Jev's answers for state x, `D(surface, answers)` the policy's decision, and `⊕`
-the merge of two verdicts (per category the stronger finding, action the stronger of the two).
+`q_t` user message, `r_t` reply, `H_t` transcript window (10 messages), `J(x)` Jev answers for state
+`x`, `D(s, a)` policy decision on surface `s`, `⊕` verdict merge (per category the stronger finding).
 
 ```
-Input verdict        V_in(t)  = D(input,  J(q_t))                        history never included
-Output verdict       V_out(t) = D(output, J(r_t))
+V_in(t)   = D(input,  J(q_t))
+V_out(t)  = D(output, J(r_t))
 
-Watch                W_t = carry_left > 0  ∨  risk_t ≥ 0.2  ∨  (placeholder ∈ H_t)
-In-context read      if W_t:  V_ctx = D(output, J(r_t | H_t)),  c = P(completes),  d = P(disengages)
-Attribution          A_t = c ≥ τ  ∧  c ≥ d  ∧  V_ctx has a finding ≥ flag           τ = 0.5
-Final                V(t) = V_out(t) ⊕ V_ctx   if A_t
-                     V(t) = V_out(t)           otherwise (V_ctx kept on record only)
+W_t       = carry_left > 0  ∨  risk_t ≥ 0.2  ∨  placeholder ∈ H_t          (watched)
+V_ctx     = D(output, J(r_t | H_t))                                          (only if W_t)
+c, d      = P(reply completes an earlier harmful request), P(user steps away)
+A_t       = c ≥ τ  ∧  c ≥ d  ∧  V_ctx has a finding ≥ flag,   τ = 0.5
+V(t)      = V_out(t) ⊕ V_ctx  if A_t,  else V_out(t)
 
-Risk                 risk_{t+1} = max(δ · risk_t, ρ(action)),  δ = 0.5
-                     ρ(allow, flag, review, block) = (0, 0.25, 0.6, 1.0)
-Carry                carry_left = 2 turns after a conversation verdict ≥ review or any block
+risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) for (allow, flag, review, block)
+carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-Six corrections to single-turn decisions came out of the same measurements, because a follow-up
-message is usually short and vague, which is exactly where they misfired. For a finding in
-category k with probability p, band thresholds θ_flag ≤ θ_review ≤ θ_block, and `choice_k` the
-hazard choice's probability for k:
+### Single-turn calibration
+
+Follow-ups are short and ambiguous; the following corrections target the single-turn errors they
+exposed. For category `k` with probability `p`, bands `θ_flag ≤ θ_review ≤ θ_block`, and `choice_k`
+the hazard-choice probability of `k`:
 
 ```
-Uncorroborated       u_k = (finding came from the sentinel alone) ∧ choice_k < 0.02
-never_below          applies only if ¬u_k ∨ p ≥ θ_block
-Weak sentinel        u_k ∧ p < θ_block                            → at most flag (recorded, delivered)
-Declining reply      output ∧ refusal ≥ 0.8 ∧ u_k ∧ p < 0.5 ∧ k ∉ {sid, prv, ipv}   → flag
-Masked, not blocked  u_k ∧ route_k = redact ∧ action = block ∧ p < 0.8               → review (redact)
-Confidence gate      escalate to review if conf < 0.65 ∧ (finding ∨ p ≥ θ_flag/2)
-                     unless intent = benign ∧ conf ≥ 0.5
-Conversation cap     escalation ≤ 0.5  → cap at flag, except cse and ssh
+u_k                 = finding from the sentinel only  ∧  choice_k < 0.02      (uncorroborated)
+never_below         applied only if ¬u_k ∨ p ≥ θ_block
+u_k ∧ p < θ_block                                                    → at most flag
+output ∧ refusal ≥ 0.8 ∧ u_k ∧ p < 0.5 ∧ k ∉ {sid, prv, ipv}         → flag
+u_k ∧ route_k = redact ∧ action = block ∧ p < 0.8                    → review (masked)
+confidence gate:  conf < 0.65 ∧ (finding ∨ p ≥ θ_flag / 2) → review,  unless intent = benign ∧ conf ≥ 0.5
+conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
 ```
 
-Specialised advice (`spc`) is judged per reply only, not across a conversation. The `ncr` and `iwp`
-descriptions now exclude victims asking what to do and questions about the law.
+Also: `spc` is judged per reply only; `ncr` and `iwp` descriptions exclude victims and questions
+about the law.
 
-### Realtime chat: review means audit
+### Realtime review handling
 
-In a realtime chat nobody can look at a message before the reply is due, so holding at review is a
-block with a promise attached. With `ReviewHandling: ReviewAsAudit`, only block stops content:
+`ReviewHandling: ReviewAsAudit`. Only `block` stops content; every verdict carries an `audit` level.
 
-| Verdict | The user gets | Audit |
+| Verdict | Delivered | Audit |
 | --- | --- | --- |
-| allow | the content | none |
-| flag | the content | sampled |
-| review | the content (masked or steered where the category says so) | priority |
-| block | the prewritten safe response | priority |
-| self-harm risk | the crisis-support response | priority |
-| Jev unreachable, fail-closed surface | held: nothing was checked | none |
+| allow | content | none |
+| flag | content | sample |
+| review | content, masked or steered where the category requires | priority |
+| block | prewritten safe response | priority |
+| self-harm risk | crisis-support response | priority |
+| degraded, fail-closed surface | held | none |
 
-Every verdict carries an `audit` level independent of delivery. Post-hoc review is the best source
-of labels: record the reviewer's outcome, add the cases to the labelled sets, and replay them before
-changing any threshold.
+### Evaluation
 
-### Results
+| Dataset | Size | Content | Labels |
+| --- | --- | --- | --- |
+| `examples/multiturn-live.jsonl` | 223 conversations | single, repeated and interleaved violations; histories beyond the window; escalations | expected outcome per case; violations referenced by id from the labelled sets |
+| `examples/multiturn-contamination.jsonl` | 26 scenarios | simulated Jev answers | expected outcome per case |
+| `examples/cases-input.jsonl`, `cases-output.jsonl` | 51 cases | single-turn | expected action |
 
-All live numbers are from Jev (`api.typesafe.ai`), with no degraded verdicts in any run.
+Protocols: **live** (Jev, both designs, every raw answer recorded); **replay** (about 5,000 recorded
+answers decided again under each variant, so variants are compared on identical data); **noise**
+(simulated answers jittered, σ ∈ {0.05, 0.1, 0.2}); **regression** (single-turn sets, before and
+after). Metrics: harmless hold rate (FPR), violation catch rate (recall), review-queue rate.
 
-**Live, 223 conversations** (`examples/multiturn-live.jsonl`): one violation or several, repeated or
-interleaved, then a harmless or a harmful turn; histories past the 10-message window; escalations,
-including ones that start after a long ordinary stretch. Harmful material is referenced by id from
-the labelled sets.
+**Live, 223 conversations**
 
-| | Earlier design (floor) | Now |
+| Metric | Floor (earlier) | Attribution (current) |
 | --- | --- | --- |
 | Harmless turns held | 171 / 194 | **0 / 194** |
 | Harmful replies caught | 19 / 19 | **19 / 19** |
 | Escalations flagged | 9 / 9 | **9 / 9** |
-| Harmless conversations sent to the review queue | 172 / 194 | **2 / 194** |
+| Harmless conversations queued for review | 172 / 194 | **2 / 194** |
 
-How it got there, run by run. In every run the in-context read attributed nothing to a harmless
-turn; everything still held after the first step was held by a single-turn check.
+**Ablation, live** (no harmless turn was attributed by the in-context read in any run; every
+remaining hold after step 2 came from a single-turn check)
 
-| Step | Live set | Harmless turns held |
+| Step | Set | Harmless turns held |
 | --- | --- | --- |
-| Floor (earlier design) | 223 conversations | 171 / 194 (88 %) |
-| Attribution, neutral placeholder | 37 conversations | 7 / 26 (27 %) |
-| Same, on a wider set | 165 conversations | 30 / 141 (21 %): 22 were plain refusals held for `cse` |
-| + sentinel corroboration, `ncr` / `iwp` descriptions | 165, four runs | 0 to 1 / 141 (0 to 0.7 %) |
-| + repeated violations and long histories added | 223 conversations | 3 / 185 (1.6 %) |
-| + weak sentinel at most flag, gate respects benign intent, conversation cap | 223 conversations | **0 / 185** |
+| 1. Floor | 223 | 171 / 194 (88 %) |
+| 2. Attribution, neutral placeholder | 37 | 7 / 26 (27 %) |
+| 3. Same, wider set | 165 | 30 / 141 (21 %) |
+| 4. + sentinel corroboration, `ncr` / `iwp` descriptions | 165 (4 runs) | 0–1 / 141 (≤ 0.7 %) |
+| 5. + repeated violations, long histories | 223 | 3 / 185 (1.6 %) |
+| 6. + weak sentinel ≤ flag, benign-intent gate, conversation cap | 223 | **0 / 185** |
 
-**Replayed offline** over every recorded Jev answer (`go/replay_test.go`): about 5,000 samples, the
-same answers decided under each variant, so every variant is compared on identical data.
+**Replay** (≈ 5,000 recorded answers)
 
 | Variant | Harmless held | Violations caught |
 | --- | --- | --- |
-| After corroboration | 0.62 % | 100 % (1,720 / 1,720) |
-| + weak sentinel at most flag, gate respects benign intent | **0.04 %** | **100 %** |
-| Re-asking Jev on borderline holds | 0.00 % | 100 %, at 11 % more calls: not adopted |
-| Realtime (`ReviewAsAudit`), all recordings | **0.02 %** stopped (1 / 4,189) | every harmful reply stopped |
+| After step 4 | 0.62 % | 100 % (1,720) |
+| After step 6 | **0.04 %** | **100 %** |
+| + re-ask on borderline holds | 0.00 % | 100 %, +11 % calls (not adopted) |
+| Realtime (`ReviewAsAudit`) | **0.02 %** stopped (1 / 4,189) | all harmful replies stopped |
 
-**Single-turn regression** (51 labelled cases, live): no labelled violation delivered before or
-after; exact matches 28 → 29.
+**Noise** (τ = 0.5): σ = 0.1 → 0.9 % harmless held, 100 % continuations caught; σ = 0.2 → 4.3 %,
+97.2 %. **Regression:** 0 labelled violations delivered before and after; exact matches 28 → 29.
 
-**Noise tolerance** (26 simulated scenarios, `examples/multiturn-contamination.jsonl`, every
-probability jittered): at σ = 0.1 and τ = 0.5, 0.9 % of harmless turns held and 100 % of
-continuations caught; at σ = 0.2, 4.3 % and 97.2 %. τ = 0.5 is the balance point.
-
-### Reproduce
+### Reproduction
 
 ```bash
 cd go
-go test ./...                                   # unit tests and the simulated scenarios, no key
-
-export JEV_API_KEY=...
-LIVE_OUT=/tmp/mt go test -tags live -run TestLiveMultiturn -v ./          # the 223 conversations
-LIVE_REVIEW=audit LIVE_OUT=/tmp/mt go test -tags live -run TestLiveMultiturn -v ./
-LIVE_POLICY_BEFORE=old.json go test -tags live -run TestLiveSingleTurnRegression -v ./
-
-REPLAY_DIRS='/tmp/mt*' go test -tags replay -run TestReplay -v ./          # offline, no key
+go test ./...                                                        # unit and simulated tests
+JEV_API_KEY=... LIVE_OUT=/tmp/mt go test -tags live -run TestLiveMultiturn -v ./
+JEV_API_KEY=... LIVE_REVIEW=audit LIVE_OUT=/tmp/mt go test -tags live -run TestLiveMultiturn -v ./
+JEV_API_KEY=... LIVE_POLICY_BEFORE=old.json go test -tags live -run TestLiveSingleTurnRegression -v ./
+REPLAY_DIRS='/tmp/mt*' go test -tags replay -run TestReplay -v ./     # offline
 ```
 
-`LIVE_OUT` keeps every raw Jev answer, which is what the replay reads.
-
-### Using it
+### Usage
 
 ```go
-guard := guardrail.New(guardrail.Options{
-	ReviewHandling: guardrail.ReviewAsAudit, // realtime chat
-})
+guard := guardrail.New(guardrail.Options{ReviewHandling: guardrail.ReviewAsAudit})
 session := guardrail.NewSession(conversationID)
 
 in, _ := guard.CheckInput(ctx, message, &guardrail.CheckOptions{Session: session})
-session.Record("user", message, in)             // a withheld turn is kept as a placeholder
+session.Record("user", message, in)
 if !in.Deliverable() {
 	return safeResponse(in)
 }
-reply := callModel(session.ModelHistory(), message) // the model never sees withheld turns
+reply := callModel(session.ModelHistory(), message)
 out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{Session: session, UserMessage: message})
 session.Record("assistant", reply, out)
 session.Advance()
-// out.Context shows the in-context read; out.Audit says what to queue.
 ```
 
-`MultiturnFloor` keeps the earlier behaviour for deployments that want it.
+`out.Context` holds the in-context read (`completes`, `disengages`, `attributed`); `out.Audit` the
+audit level. `Multiturn: MultiturnFloor` restores the earlier design.
 
-### Limits
+### Limitations
 
-- The labelled violations are 30 texts, and there is no real child-safety positive among them, so
-  the recall of the sentinel corroboration on `cse` is unmeasured on the harmful side. Those signals
-  are still recorded and audited.
-- A decomposed attack whose early pieces raise nothing is read in context only once the
-  conversation check notices it, one turn late, as before.
-- In a watched session a reply costs one more Jev request, sent in parallel.
+- 30 labelled violation texts; no real `cse` positive, so recall of sentinel corroboration on `cse`
+  is unmeasured. Those signals remain recorded for audit.
+- A decomposed attack whose first pieces raise nothing is read in context one turn late.
+- A watched session costs one additional Jev request per reply, in parallel.
 
 ---
 

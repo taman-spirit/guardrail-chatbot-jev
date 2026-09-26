@@ -263,72 +263,78 @@ ce qui est demandé au modèle, sans toucher au code.
 
 ## Conversations multi-tours
 
-Une attaque multi-tours se compose de messages défendables un à un ; il faut donc lire la
-conversation. Mais la lire naïvement produit l'erreur inverse : le classifieur voit une violation dans
-l'historique et attribue la même étiquette au message suivant, même s'il s'agit d'excuses, d'une
-question sur la loi ou de la météo. C'est la **contamination par le contexte**. L'ancienne conception
-retenait tout tour suivant une violation : mesurée en direct avec Jev, elle retenait **171 messages
-inoffensifs sur 194**.
+### Problème
 
-**Principe : l'historique sert à comprendre le tour courant, jamais à le condamner.** Un tour n'est
-retenu que pour ce que lui-même, ou la réponse qui lui est faite, contient.
+**Contamination par le contexte :** un classifieur qui lit une violation dans l'historique l'attribue au
+tour suivant, quel qu'en soit le contenu. Référence (plancher de session, ancienne conception) :
+**171 sur 194** messages inoffensifs retenus, mesuré en direct.
 
-1. **L'entrée est lue seule**, sans historique ; le risque de la session n'est pas envoyé à Jev.
-2. **La réponse est lue seule et, dans une session surveillée, aussi en contexte**, en parallèle.
-3. **La lecture en contexte ne compte que si la réponse complète elle-même une demande nuisible
-   antérieure** (étape suivante, précision, reformulation, traduction, récit fictif).
-4. **Un tour retenu reste dans l'historique sous la forme `[earlier message omitted]`** : la tentative
-   est mémorisée, son texte n'est jamais relu, et le modèle ne le voit pas.
-5. **La vérification de conversation surveille sans retenir** ; une conversation qui ne progresse pas
-   vers un objectif nuisible est plafonnée à `flag`.
-6. **Dans une session surveillée, la réponse n'est pas diffusée par morceaux** avant la vérification
-   finale en contexte.
+### Règle de conception
 
-```
-Input verdict        V_in(t)  = D(input,  J(q_t))                        history never included
-Output verdict       V_out(t) = D(output, J(r_t))
+Un tour n'est retenu que sur la base d'éléments issus du tour lui-même ou de sa réponse. L'historique
+détermine le degré d'attention porté au tour, jamais sa rétention.
 
-Watch                W_t = carry_left > 0  ∨  risk_t ≥ 0.2  ∨  (placeholder ∈ H_t)
-In-context read      if W_t:  V_ctx = D(output, J(r_t | H_t)),  c = P(completes),  d = P(disengages)
-Attribution          A_t = c ≥ τ  ∧  c ≥ d  ∧  V_ctx has a finding ≥ flag           τ = 0.5
-Final                V(t) = V_out(t) ⊕ V_ctx   if A_t
-                     V(t) = V_out(t)           otherwise (V_ctx kept on record only)
+### Méthode
 
-Risk                 risk_{t+1} = max(δ · risk_t, ρ(action)),  δ = 0.5
-                     ρ(allow, flag, review, block) = (0, 0.25, 0.6, 1.0)
-Carry                carry_left = 2 turns after a conversation verdict ≥ review or any block
-```
+| Composant | Règle |
+| --- | --- |
+| Vérification d'entrée | Lit `q_t` seul. Ni historique, ni risque de session. |
+| Vérification de sortie | Lit `r_t` seul ; en session surveillée, aussi `r_t` sachant `H_t`, en requête parallèle. |
+| Attribution | Les constats en contexte ne comptent que si la réponse complète une demande nuisible antérieure. |
+| Tours retenus | Conservés sous la forme `[earlier message omitted]` ; exclus de `Session.ModelHistory()`. |
+| Vérification de conversation | Surveillance seulement ; plafonnée à `flag` si escalation ≤ 0,5. |
+| Streaming | En session surveillée, la réponse est délivrée après la vérification finale en contexte. |
+
+### Définitions
 
 ```
-Uncorroborated       u_k = (finding came from the sentinel alone) ∧ choice_k < 0.02
-never_below          applies only if ¬u_k ∨ p ≥ θ_block
-Weak sentinel        u_k ∧ p < θ_block                            → at most flag (recorded, delivered)
-Declining reply      output ∧ refusal ≥ 0.8 ∧ u_k ∧ p < 0.5 ∧ k ∉ {sid, prv, ipv}   → flag
-Masked, not blocked  u_k ∧ route_k = redact ∧ action = block ∧ p < 0.8               → review (redact)
-Confidence gate      escalate to review if conf < 0.65 ∧ (finding ∨ p ≥ θ_flag/2)
-                     unless intent = benign ∧ conf ≥ 0.5
-Conversation cap     escalation ≤ 0.5  → cap at flag, except cse and ssh
+V_in(t)   = D(input,  J(q_t))
+V_out(t)  = D(output, J(r_t))
+
+W_t       = carry_left > 0  ∨  risk_t ≥ 0.2  ∨  placeholder ∈ H_t          (watched)
+V_ctx     = D(output, J(r_t | H_t))                                          (only if W_t)
+c, d      = P(reply completes an earlier harmful request), P(user steps away)
+A_t       = c ≥ τ  ∧  c ≥ d  ∧  V_ctx has a finding ≥ flag,   τ = 0.5
+V(t)      = V_out(t) ⊕ V_ctx  if A_t,  else V_out(t)
+
+risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) for (allow, flag, review, block)
+carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-**Chat en temps réel :** avec `ReviewHandling: ReviewAsAudit`, seul `block` arrête le contenu ; `review`
-délivre le contenu et le place en file d'audit prioritaire, `flag` en file d'échantillonnage. Un verdict
-dégradé sur une surface fail-closed reste retenu.
+### Calibrage mono-tour
 
-| Mesure en direct, 223 conversations | Ancienne conception | Maintenant |
+```
+u_k                 = finding from the sentinel only  ∧  choice_k < 0.02      (uncorroborated)
+never_below         applied only if ¬u_k ∨ p ≥ θ_block
+u_k ∧ p < θ_block                                                    → at most flag
+output ∧ refusal ≥ 0.8 ∧ u_k ∧ p < 0.5 ∧ k ∉ {sid, prv, ipv}         → flag
+u_k ∧ route_k = redact ∧ action = block ∧ p < 0.8                    → review (masked)
+confidence gate:  conf < 0.65 ∧ (finding ∨ p ≥ θ_flag / 2) → review,  unless intent = benign ∧ conf ≥ 0.5
+conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
+```
+
+### Revue en temps réel
+
+`ReviewHandling: ReviewAsAudit` : seul `block` arrête le contenu ; `review` délivre et place en audit
+prioritaire, `flag` en audit par échantillonnage ; un verdict dégradé sur une surface fail-closed reste
+retenu.
+
+### Résultats
+
+| Mesure en direct, 223 conversations | Plancher (ancien) | Attribution (actuel) |
 | --- | --- | --- |
 | Messages inoffensifs retenus | 171 / 194 | **0 / 194** |
 | Réponses nuisibles détectées | 19 / 19 | **19 / 19** |
 | Escalades signalées | 9 / 9 | **9 / 9** |
-| Conversations inoffensives envoyées en revue | 172 / 194 | **2 / 194** |
+| Conversations inoffensives en file de revue | 172 / 194 | **2 / 194** |
 
-| Rejeu hors ligne, environ 5 000 réponses enregistrées | Inoffensifs retenus | Violations détectées |
+| Rejeu, ≈ 5 000 réponses enregistrées | Inoffensifs retenus | Violations détectées |
 | --- | --- | --- |
-| Après corroboration des sentinelles | 0,62 % | 100 % |
-| + sentinelle faible plafonnée, garde de confiance selon l'intention | **0,04 %** | **100 %** |
-| Temps réel (`ReviewAsAudit`) | **0,02 %** arrêtés (1 / 4 189) | toutes les réponses nuisibles arrêtées |
+| Avant calibrage final | 0,62 % | 100 % |
+| Après calibrage final | **0,04 %** | **100 %** |
+| Temps réel (`ReviewAsAudit`) | **0,02 %** arrêtés | toutes les réponses nuisibles arrêtées |
 
-Méthode complète, étapes mesurées, tolérance au bruit, régression et commandes de reproduction :
-[version anglaise](README.md#multi-turn).
+Jeux de données, protocoles, ablation, bruit, régression et reproduction : [version anglaise](README.md#multi-turn).
 
 ---
 

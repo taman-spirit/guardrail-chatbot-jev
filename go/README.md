@@ -53,11 +53,13 @@ Three differences worth knowing:
 
 ## Multi-turn and realtime chat
 
-A turn is held only for what it, or the reply to it, does; the history is used to understand a
-turn, never to convict it. In a watched session the reply is also read against the earlier turns,
-and those findings count only when the reply itself completes an earlier harmful request. With
-`ReviewHandling: ReviewAsAudit`, meant for realtime chat, only `block` stops content and `review`
-delivers it and queues it for audit.
+| Component | Rule |
+| --- | --- |
+| Input check | `q_t` only; no history, no session risk. |
+| Output check | `r_t` alone; in a watched session also `r_t` given `H_t`, in parallel. |
+| Attribution | In-context findings count only if the reply completes an earlier harmful request. |
+| Withheld turns | Kept as `[earlier message omitted]`; excluded from `Session.ModelHistory()`. |
+| Realtime | `ReviewAsAudit`: only `block` stops content; every verdict carries an `audit` level. |
 
 ```go
 guard := guardrail.New(guardrail.Options{ReviewHandling: guardrail.ReviewAsAudit})
@@ -71,10 +73,8 @@ session.Record("assistant", reply, out)
 session.Advance()
 ```
 
-Measured live on 223 conversations: 0 of 194 harmless follow-ups held (the earlier floor held
-171), every harmful reply and escalation still caught. The method, the formulas and all results are
-in the [Multi-turn section of the main README](../README.md#multi-turn). `MultiturnFloor` keeps the
-earlier behaviour.
+Live, 223 conversations: harmless turns held 171 / 194 → 0 / 194; harmful replies and escalations
+all caught. Definitions, evaluation and results: [main README](../README.md#multi-turn).
 
 ## Streaming
 

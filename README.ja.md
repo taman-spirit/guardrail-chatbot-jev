@@ -247,66 +247,76 @@ finding）。
 
 ## マルチターン
 
-マルチターン攻撃は、一つずつ見れば無害に見えるメッセージの積み重ねなので、会話全体を読む必要があります。
-しかし素朴に読むと逆の失敗が起きます。分類器が履歴の違反を見て、次のメッセージ（謝罪、法律の質問、天気の質問）
-にも同じラベルを付けてしまう。これが**文脈汚染**です。以前の設計は違反の後のターンをすべて保留しており、
-Jev で実測すると**無害な後続 194 件中 171 件**を保留していました。
+### 問題
 
-**原則：履歴は現在のターンを理解するためのものであり、裁くためのものではない。** ターンが保留されるのは、
-そのターン自身、またはそれへの応答が有害な場合だけです。
+**文脈汚染：** 分類器が履歴中の違反を読むと、次のターンの内容にかかわらず同じ違反を割り当てる。
+比較基準（セッションのフロア、以前の設計）：実測で無害な後続 **194 件中 171 件**を保留。
 
-1. **入力は単独で読みます。** 履歴もセッションのリスク値も Jev には送りません。
-2. **応答は単独で読み、監視中のセッションでは文脈付きでも並列に読みます。**
-3. **文脈付きの読みは、応答自体が以前の有害な依頼を完成させる場合にだけ反映します**
-   （次の手順、詳細、言い換え、翻訳、フィクションとしての再話）。
-4. **保留したターンは `[earlier message omitted]` として履歴に残します。** 試みは記憶されますが、本文は二度と
-   読まれず、モデルにも見せません。
-5. **会話チェックは監視のみで、ターンを保留しません。** 有害な目的に向かっていない会話は `flag` までに抑えます。
-6. **監視中のセッションでは応答を分割配信せず**、文脈付きの最終チェックの後に送ります。
+### 設計原則
 
-```
-Input verdict        V_in(t)  = D(input,  J(q_t))                        history never included
-Output verdict       V_out(t) = D(output, J(r_t))
+ターンを保留する根拠は、そのターン自身またはその応答から得た証拠に限る。履歴は読む深さを決めるだけで、
+保留の可否は決めない。
 
-Watch                W_t = carry_left > 0  ∨  risk_t ≥ 0.2  ∨  (placeholder ∈ H_t)
-In-context read      if W_t:  V_ctx = D(output, J(r_t | H_t)),  c = P(completes),  d = P(disengages)
-Attribution          A_t = c ≥ τ  ∧  c ≥ d  ∧  V_ctx has a finding ≥ flag           τ = 0.5
-Final                V(t) = V_out(t) ⊕ V_ctx   if A_t
-                     V(t) = V_out(t)           otherwise (V_ctx kept on record only)
+### 手法
 
-Risk                 risk_{t+1} = max(δ · risk_t, ρ(action)),  δ = 0.5
-                     ρ(allow, flag, review, block) = (0, 0.25, 0.6, 1.0)
-Carry                carry_left = 2 turns after a conversation verdict ≥ review or any block
-```
+| 構成要素 | 規則 |
+| --- | --- |
+| 入力チェック | `q_t` のみを読む。履歴もセッションのリスクも使わない。 |
+| 出力チェック | `r_t` を単独で読む。監視中のセッションでは `r_t` を `H_t` 付きでも並列に読む。 |
+| 帰属 | 文脈付きの所見は、応答が以前の有害な依頼を完成させる場合にだけ数える。 |
+| 保留ターン | `[earlier message omitted]` として保持し、`Session.ModelHistory()` から除外する。 |
+| 会話チェック | 監視のみで保留しない。escalation ≤ 0.5 なら `flag` まで。 |
+| ストリーミング | 監視中のセッションでは、文脈付きの最終チェック後に応答を送る。 |
+
+### 定義
 
 ```
-Uncorroborated       u_k = (finding came from the sentinel alone) ∧ choice_k < 0.02
-never_below          applies only if ¬u_k ∨ p ≥ θ_block
-Weak sentinel        u_k ∧ p < θ_block                            → at most flag (recorded, delivered)
-Declining reply      output ∧ refusal ≥ 0.8 ∧ u_k ∧ p < 0.5 ∧ k ∉ {sid, prv, ipv}   → flag
-Masked, not blocked  u_k ∧ route_k = redact ∧ action = block ∧ p < 0.8               → review (redact)
-Confidence gate      escalate to review if conf < 0.65 ∧ (finding ∨ p ≥ θ_flag/2)
-                     unless intent = benign ∧ conf ≥ 0.5
-Conversation cap     escalation ≤ 0.5  → cap at flag, except cse and ssh
+V_in(t)   = D(input,  J(q_t))
+V_out(t)  = D(output, J(r_t))
+
+W_t       = carry_left > 0  ∨  risk_t ≥ 0.2  ∨  placeholder ∈ H_t          (watched)
+V_ctx     = D(output, J(r_t | H_t))                                          (only if W_t)
+c, d      = P(reply completes an earlier harmful request), P(user steps away)
+A_t       = c ≥ τ  ∧  c ≥ d  ∧  V_ctx has a finding ≥ flag,   τ = 0.5
+V(t)      = V_out(t) ⊕ V_ctx  if A_t,  else V_out(t)
+
+risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) for (allow, flag, review, block)
+carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-**リアルタイムチャット：** `ReviewHandling: ReviewAsAudit` では `block` だけが内容を止めます。`review` は内容を
-届けたうえで優先監査キューへ、`flag` はサンプリング監査へ回します。fail-closed の面での degraded 判定は保留のままです。
+### 単一ターンの較正
 
-| 実測、223 会話 | 以前の設計 | 現在 |
+```
+u_k                 = finding from the sentinel only  ∧  choice_k < 0.02      (uncorroborated)
+never_below         applied only if ¬u_k ∨ p ≥ θ_block
+u_k ∧ p < θ_block                                                    → at most flag
+output ∧ refusal ≥ 0.8 ∧ u_k ∧ p < 0.5 ∧ k ∉ {sid, prv, ipv}         → flag
+u_k ∧ route_k = redact ∧ action = block ∧ p < 0.8                    → review (masked)
+confidence gate:  conf < 0.65 ∧ (finding ∨ p ≥ θ_flag / 2) → review,  unless intent = benign ∧ conf ≥ 0.5
+conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
+```
+
+### リアルタイムでのレビュー
+
+`ReviewHandling: ReviewAsAudit`：内容を止めるのは `block` のみ。`review` は配信して優先監査へ、`flag` は
+サンプリング監査へ回す。fail-closed の面の degraded 判定は保留のまま。
+
+### 結果
+
+| 実測、223 会話 | フロア（以前） | 帰属（現在） |
 | --- | --- | --- |
 | 保留された無害なターン | 171 / 194 | **0 / 194** |
 | 検出した有害な応答 | 19 / 19 | **19 / 19** |
 | 検出したエスカレーション | 9 / 9 | **9 / 9** |
 | レビューに回った無害な会話 | 172 / 194 | **2 / 194** |
 
-| 記録した約 5,000 件の回答によるオフライン再判定 | 無害の保留 | 違反の検出 |
+| 再判定、記録済み約 5,000 件 | 無害の保留 | 違反の検出 |
 | --- | --- | --- |
-| センチネル裏付けの導入後 | 0.62 % | 100 % |
-| ＋弱いセンチネルは flag まで、信頼度ゲートは意図を考慮 | **0.04 %** | **100 %** |
-| リアルタイム（`ReviewAsAudit`） | **0.02 %** 停止（1 / 4,189） | 有害な応答はすべて停止 |
+| 最終較正の前 | 0.62 % | 100 % |
+| 最終較正の後 | **0.04 %** | **100 %** |
+| リアルタイム（`ReviewAsAudit`） | **0.02 %** 停止 | 有害な応答はすべて停止 |
 
-手法の詳細、段階ごとの実測、ノイズ耐性、回帰テスト、再現コマンドは[英語版](README.md#multi-turn)を参照してください。
+データセット、手順、アブレーション、ノイズ、回帰、再現手順は[英語版](README.md#multi-turn)を参照。
 
 ---
 

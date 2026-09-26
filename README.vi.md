@@ -256,205 +256,164 @@ model, không cần đụng tới code.
 
 ## Nhiều lượt (multi-turn)
 
-Tấn công nhiều lượt được ghép từ những lượt mà lượt nào đứng riêng cũng có vẻ vô hại, nên guardrail
-phải đọc cả hội thoại, không chỉ từng tin nhắn. Nhưng đọc một cách ngây thơ thì lại hỏng theo chiều
-ngược lại: bộ phân loại thấy một vi phạm trong lịch sử rồi gán luôn nhãn đó cho câu tiếp theo, dù đó
-là một lời xin lỗi, một câu hỏi về pháp luật hay một câu hỏi thời tiết. Hiện tượng này gọi là
-**lây nhiễm ngữ cảnh** (context contamination), và là nguồn chặn nhầm lớn nhất của guardrail cho
-chatbot.
+### Vấn đề
 
-Thiết kế trước đây giữ lại mọi lượt đứng sau một vi phạm, dù lượt đó sạch. Đo trực tiếp với Jev trên
-bộ kịch bản dưới đây, nó giữ nhầm **171 trên 194 câu vô hại**. Phần này mô tả thiết kế thay thế, cách
-nó ra quyết định, và kết quả đo được.
+**Lây nhiễm ngữ cảnh:** bộ phân loại thấy một vi phạm trong lịch sử thì gán vi phạm đó cho lượt kế
+tiếp, bất kể lượt đó chứa gì. Mốc so sánh (mức sàn theo session, thiết kế cũ): giữ **171 trên 194** câu
+vô hại, đo trực tiếp.
 
-### Nguyên tắc
+### Nguyên tắc thiết kế
 
-**Lịch sử dùng để hiểu lượt hiện tại, không dùng để kết tội nó.** Một lượt chỉ bị giữ vì chính lượt
-đó, hoặc câu trả lời cho nó, gây hại. Rủi ro mang từ các lượt trước chỉ quyết định lượt đó được đọc
-*kỹ đến đâu*, không bao giờ quyết định nó *có bị giữ hay không*.
+Một lượt chỉ bị giữ dựa trên bằng chứng từ chính lượt đó hoặc từ câu trả lời cho nó. Lịch sử quyết định
+lượt đó được đọc kỹ đến đâu, không quyết định nó có bị giữ hay không.
 
-Hai hệ quả:
+### Phương pháp
 
-- *Liên quan không có nghĩa là tiếp nối.* "Chế tạo chất nổ bị phạt thế nào?" nhắc lại một yêu cầu đã
-  bị chặn, nhưng là để lùi lại. "Tiếp đi, bước 2 là gì?" thì tiếp nối. Chỉ câu thứ hai được phép bị
-  giữ.
-- *Chấm thứ sắp được gửi đi, không đoán ý định.* Nếu câu theo sau vô hại thì câu trả lời cho nó cũng
-  vô hại, không có gì để giữ. Nếu đó là một nỗ lực tiếp nối, cái hại sẽ lộ ra trong câu trả lời, và
-  câu trả lời luôn bị kiểm tra.
+| Thành phần | Quy tắc |
+| --- | --- |
+| Kiểm tra input | Chỉ đọc `q_t`. Không lịch sử, không điểm rủi ro session. |
+| Kiểm tra output | Đọc riêng `r_t`. Khi session đang được theo dõi, đọc thêm `r_t` kèm `H_t`, bằng một request song song. |
+| Quy lỗi | Phát hiện có ngữ cảnh chỉ được tính khi câu trả lời hoàn tất một yêu cầu có hại trước đó. |
+| Lượt bị giữ | Lưu dạng `[earlier message omitted]`; không có trong `Session.ModelHistory()`. |
+| Kiểm tra hội thoại | Chỉ theo dõi, không giữ lượt. Tối đa `flag` khi escalation ≤ 0.5. |
+| Streaming | Khi session đang được theo dõi, câu trả lời chỉ được gửi sau lần kiểm tra cuối có ngữ cảnh. |
 
-### Một lượt được quyết định thế nào
+### Định nghĩa
 
-1. **Input chỉ đọc chính nó.** Kiểm tra input không bao giờ thấy lịch sử, nên quá khứ không thể làm
-   một câu hỏi bị chặn. Điểm rủi ro của session cũng không được gửi cho Jev.
-2. **Output được đọc riêng, và khi session đang được theo dõi thì đọc thêm có ngữ cảnh.** Khi session
-   *đang được theo dõi* (xem bên dưới), câu trả lời được gửi hai lần, song song nên không thêm độ trễ:
-   một lần đứng riêng, một lần kèm các lượt trước. Request đứng riêng không bao giờ chứa lịch sử, nên
-   luôn "sạch".
-3. **Kết quả đọc có ngữ cảnh chỉ được tính khi chính câu trả lời hoàn tất một yêu cầu có hại trước
-   đó.** Ngoài câu hỏi phân loại nguy cơ, request có ngữ cảnh hỏi thêm hai câu có/không: câu trả lời
-   có cung cấp nội dung có hại, hoặc hoàn tất một yêu cầu có hại ở lượt trước không (bước tiếp theo,
-   thêm chi tiết, diễn đạt lại, dịch, kể lại dưới dạng hư cấu)? Và tin nhắn mới nhất của người dùng có
-   chỉ nhắc lại để lùi ra không (xin lỗi, hỏi pháp luật, cách phòng tránh hay báo cáo, hỏi vì sao bị
-   từ chối, đổi chủ đề)?
-4. **Lượt bị giữ được nhớ, nhưng không đọc lại.** Lượt đó nằm lại trong lịch sử dưới dạng
-   `[earlier message omitted]`, nên kiểm tra hội thoại vẫn thấy "đã có một lần thử". Jev không bao giờ
-   đọc lại nội dung bị chặn, còn mô hình chat thì hoàn toàn không thấy nó (`session.ModelHistory()`
-   bỏ lượt đó ra).
-5. **Kiểm tra hội thoại chỉ theo dõi, không giữ lượt.** Nó chạy ngoài luồng chính, cập nhật rủi ro và
-   trạng thái theo dõi của session, và đưa hội thoại vào hàng đợi xem xét. Hội thoại không tiến về mục
-   tiêu có hại thì bị giới hạn ở mức `flag`.
-6. **Session đang được theo dõi thì không stream từng phần.** Kiểm tra giữa dòng đọc từng đoạn riêng
-   lẻ, nên một đoạn chỉ có hại khi ghép ngữ cảnh có thể lọt. Trong session đang được theo dõi, câu trả
-   lời chỉ được gửi sau lần kiểm tra cuối có ngữ cảnh.
-
-### Công thức
-
-Ký hiệu: `q_t` là tin nhắn người dùng ở lượt t, `r_t` là câu trả lời, `H_t` là cửa sổ lịch sử (10 tin
-nhắn), `J(x)` là câu trả lời của Jev cho trạng thái x, `D(bề mặt, câu trả lời)` là quyết định theo
-policy, và `⊕` là phép gộp hai verdict (mỗi nhóm lấy phát hiện mạnh hơn, hành động lấy mức mạnh hơn).
+`q_t` tin nhắn người dùng, `r_t` câu trả lời, `H_t` cửa sổ lịch sử (10 tin nhắn), `J(x)` câu trả lời của
+Jev cho trạng thái `x`, `D(s, a)` quyết định theo policy trên bề mặt `s`, `⊕` phép gộp verdict (mỗi nhóm
+lấy phát hiện mạnh hơn).
 
 ```
-Verdict input        V_in(t)  = D(input,  J(q_t))                        không bao giờ kèm lịch sử
-Verdict output       V_out(t) = D(output, J(r_t))
+V_in(t)   = D(input,  J(q_t))
+V_out(t)  = D(output, J(r_t))
 
-Theo dõi             W_t = carry_left > 0  ∨  risk_t ≥ 0.2  ∨  (có placeholder trong H_t)
-Đọc có ngữ cảnh      nếu W_t:  V_ctx = D(output, J(r_t | H_t)),  c = P(hoàn tất),  d = P(lùi ra)
-Quy lỗi              A_t = c ≥ τ  ∧  c ≥ d  ∧  V_ctx có phát hiện ≥ flag          τ = 0.5
-Kết quả              V(t) = V_out(t) ⊕ V_ctx   nếu A_t
-                     V(t) = V_out(t)           ngược lại (V_ctx chỉ được ghi lại)
+W_t       = carry_left > 0  ∨  risk_t ≥ 0.2  ∨  placeholder ∈ H_t          (đang được theo dõi)
+V_ctx     = D(output, J(r_t | H_t))                                          (chỉ khi W_t)
+c, d      = P(câu trả lời hoàn tất yêu cầu có hại trước đó), P(người dùng lùi ra)
+A_t       = c ≥ τ  ∧  c ≥ d  ∧  V_ctx có phát hiện ≥ flag,   τ = 0.5
+V(t)      = V_out(t) ⊕ V_ctx  nếu A_t,  ngược lại V_out(t)
 
-Rủi ro               risk_{t+1} = max(δ · risk_t, ρ(hành động)),  δ = 0.5
-                     ρ(allow, flag, review, block) = (0, 0.25, 0.6, 1.0)
-Theo dõi tiếp        carry_left = 2 lượt sau một verdict hội thoại ≥ review hoặc bất kỳ block nào
+risk_t+1  = max(δ · risk_t, ρ(hành động)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) cho (allow, flag, review, block)
+carry     = 2 lượt sau một verdict hội thoại ≥ review hoặc bất kỳ block nào
 ```
 
-Cũng từ các lần đo này, có sáu điều chỉnh cho quyết định đơn lượt, vì câu theo sau thường ngắn và mơ
-hồ, đúng chỗ các quyết định đó hay sai. Với một phát hiện thuộc nhóm k có xác suất p, các ngưỡng
-θ_flag ≤ θ_review ≤ θ_block, và `choice_k` là xác suất mà câu hỏi phân loại chính cho nhóm k:
+### Hiệu chỉnh đơn lượt
+
+Câu theo sau thường ngắn và mơ hồ; các hiệu chỉnh dưới đây nhắm vào những lỗi đơn lượt mà chúng làm lộ
+ra. Với nhóm `k`, xác suất `p`, các ngưỡng `θ_flag ≤ θ_review ≤ θ_block`, và `choice_k` là xác suất mà
+câu hỏi phân loại chính cho `k`:
 
 ```
-Chưa được xác nhận   u_k = (phát hiện chỉ đến từ sentinel) ∧ choice_k < 0.02
-never_below          chỉ áp dụng khi ¬u_k ∨ p ≥ θ_block
-Sentinel yếu         u_k ∧ p < θ_block                          → tối đa flag (ghi nhận, vẫn gửi)
-Câu trả lời từ chối  output ∧ refusal ≥ 0.8 ∧ u_k ∧ p < 0.5 ∧ k ∉ {sid, prv, ipv}   → flag
-Che thay vì chặn     u_k ∧ route_k = redact ∧ hành động = block ∧ p < 0.8           → review (che)
-Cổng độ tự tin       nâng lên review nếu conf < 0.65 ∧ (có phát hiện ∨ p ≥ θ_flag/2)
-                     trừ khi intent = benign ∧ conf ≥ 0.5
-Giới hạn hội thoại   escalation ≤ 0.5  → tối đa flag, trừ cse và ssh
+u_k                 = phát hiện chỉ từ sentinel  ∧  choice_k < 0.02           (chưa được xác nhận)
+never_below         chỉ áp dụng khi ¬u_k ∨ p ≥ θ_block
+u_k ∧ p < θ_block                                                    → tối đa flag
+output ∧ refusal ≥ 0.8 ∧ u_k ∧ p < 0.5 ∧ k ∉ {sid, prv, ipv}         → flag
+u_k ∧ route_k = redact ∧ hành động = block ∧ p < 0.8                 → review (che thông tin)
+cổng tự tin:  conf < 0.65 ∧ (có phát hiện ∨ p ≥ θ_flag / 2) → review,  trừ khi intent = benign ∧ conf ≥ 0.5
+hội thoại:    escalation ≤ 0.5 → tối đa flag,  trừ cse, ssh
 ```
 
-Lời khuyên chuyên môn (`spc`) chỉ được chấm ở từng câu trả lời, không chấm trên cả hội thoại. Mô tả
-của `ncr` và `iwp` nay loại trừ người bị hại hỏi cách xử lý và các câu hỏi về pháp luật.
+Ngoài ra: `spc` chỉ chấm ở từng câu trả lời; mô tả `ncr` và `iwp` loại trừ người bị hại và câu hỏi về
+pháp luật.
 
-### Chat realtime: review nghĩa là hậu kiểm
+### Xử lý review trong chat realtime
 
-Trong chat realtime không ai kịp xem tin nhắn trước khi phải trả lời, nên giữ lại ở mức `review` thực
-chất là chặn kèm một lời hứa. Với `ReviewHandling: ReviewAsAudit`, chỉ `block` mới dừng nội dung:
+`ReviewHandling: ReviewAsAudit`. Chỉ `block` dừng nội dung; mọi verdict có mức `audit`.
 
-| Verdict | Người dùng nhận được | Hậu kiểm |
+| Verdict | Người dùng nhận | Hậu kiểm |
 | --- | --- | --- |
 | allow | nội dung | không |
 | flag | nội dung | lấy mẫu |
-| review | nội dung (được che hoặc điều hướng nếu nhóm đó yêu cầu) | ưu tiên |
+| review | nội dung, được che hoặc điều hướng nếu nhóm yêu cầu | ưu tiên |
 | block | câu trả lời an toàn viết sẵn | ưu tiên |
 | nguy cơ tự hại | lời hỗ trợ khủng hoảng | ưu tiên |
-| Jev không phản hồi, bề mặt fail-closed | giữ lại, vì chưa có gì được kiểm tra | không |
+| degraded, bề mặt fail-closed | giữ lại | không |
 
-Mỗi verdict có mức `audit` riêng, độc lập với việc có gửi hay không. Hậu kiểm là nguồn nhãn tốt nhất:
-ghi lại kết luận của người xem, đưa case vào bộ dữ liệu có nhãn, và chấm lại offline trước khi đổi bất
-kỳ ngưỡng nào.
+### Đánh giá
 
-### Kết quả
+| Bộ dữ liệu | Cỡ | Nội dung | Nhãn |
+| --- | --- | --- | --- |
+| `examples/multiturn-live.jsonl` | 223 hội thoại | vi phạm đơn lẻ, lặp lại, xen kẽ; lịch sử vượt cửa sổ; leo thang | kết quả kỳ vọng từng case; vi phạm tham chiếu bằng id từ các bộ có nhãn |
+| `examples/multiturn-contamination.jsonl` | 26 kịch bản | câu trả lời Jev giả lập | kết quả kỳ vọng từng case |
+| `examples/cases-input.jsonl`, `cases-output.jsonl` | 51 case | đơn lượt | hành động kỳ vọng |
 
-Mọi số liệu chạy thật đều từ Jev (`api.typesafe.ai`), không lần chạy nào có verdict degraded.
+Quy trình: **chạy thật** (Jev, cả hai thiết kế, ghi lại mọi câu trả lời thô); **chấm lại** (khoảng
+5.000 câu trả lời đã ghi được quyết định lại theo từng phương án, nên các phương án được so trên cùng dữ
+liệu); **nhiễu** (câu trả lời giả lập bị thêm nhiễu, σ ∈ {0.05, 0.1, 0.2}); **hồi quy** (bộ đơn lượt,
+trước và sau). Chỉ số: tỷ lệ giữ câu vô hại (FPR), tỷ lệ bắt vi phạm (recall), tỷ lệ vào hàng đợi
+xem xét.
 
-**Chạy thật, 223 hội thoại** (`examples/multiturn-live.jsonl`): một hoặc nhiều lần vi phạm (lặp lại
-hoặc xen kẽ), rồi một lượt vô hại hoặc có hại; lịch sử dài quá cửa sổ 10 tin nhắn; hội thoại leo thang,
-kể cả leo thang sau một đoạn dài bình thường. Nội dung vi phạm được tham chiếu bằng `id` tới các bộ dữ
-liệu có nhãn.
+**Chạy thật, 223 hội thoại**
 
-| | Thiết kế cũ (mức sàn) | Hiện tại |
+| Chỉ số | Mức sàn (cũ) | Quy lỗi (hiện tại) |
 | --- | --- | --- |
 | Câu vô hại bị giữ | 171 / 194 | **0 / 194** |
 | Câu trả lời có hại bị bắt | 19 / 19 | **19 / 19** |
 | Hội thoại leo thang bị phát hiện | 9 / 9 | **9 / 9** |
-| Hội thoại vô hại bị đưa vào hàng đợi xem xét | 172 / 194 | **2 / 194** |
+| Hội thoại vô hại vào hàng đợi xem xét | 172 / 194 | **2 / 194** |
 
-Từng bước cải thiện, theo từng lần chạy. Ở mọi lần chạy, việc đọc có ngữ cảnh chưa lần nào quy lỗi
-cho một câu vô hại; từ bước thứ hai trở đi, mọi câu còn bị giữ đều do kiểm tra đơn lượt.
+**Ablation, chạy thật** (ở mọi lần chạy, việc đọc có ngữ cảnh không quy lỗi cho câu vô hại nào; từ bước
+2, mọi câu còn bị giữ đều do kiểm tra đơn lượt)
 
-| Bước | Bộ chạy thật | Câu vô hại bị giữ |
+| Bước | Bộ | Câu vô hại bị giữ |
 | --- | --- | --- |
-| Mức sàn (thiết kế cũ) | 223 hội thoại | 171 / 194 (88 %) |
-| Quy lỗi, placeholder trung tính | 37 hội thoại | 7 / 26 (27 %) |
-| Như trên, bộ rộng hơn | 165 hội thoại | 30 / 141 (21 %): 22 là câu từ chối bị giữ vì `cse` |
-| + xác nhận sentinel, mô tả `ncr` / `iwp` | 165, bốn lần chạy | 0 đến 1 / 141 (0 đến 0,7 %) |
-| + thêm vi phạm lặp lại và lịch sử dài | 223 hội thoại | 3 / 185 (1,6 %) |
-| + sentinel yếu tối đa flag, cổng tự tin theo intent, giới hạn hội thoại | 223 hội thoại | **0 / 185** |
+| 1. Mức sàn | 223 | 171 / 194 (88 %) |
+| 2. Quy lỗi, placeholder trung tính | 37 | 7 / 26 (27 %) |
+| 3. Như trên, bộ rộng hơn | 165 | 30 / 141 (21 %) |
+| 4. + xác nhận sentinel, mô tả `ncr` / `iwp` | 165 (4 lần) | 0–1 / 141 (≤ 0,7 %) |
+| 5. + vi phạm lặp lại, lịch sử dài | 223 | 3 / 185 (1,6 %) |
+| 6. + sentinel yếu ≤ flag, cổng tự tin theo intent, giới hạn hội thoại | 223 | **0 / 185** |
 
-**Chấm lại offline** trên toàn bộ câu trả lời Jev đã ghi (`go/replay_test.go`): khoảng 5.000 mẫu, mỗi
-phương án được quyết định trên cùng một bộ câu trả lời, nên các phương án được so trên dữ liệu giống
-hệt nhau.
+**Chấm lại** (≈ 5.000 câu trả lời đã ghi)
 
-| Phương án | Câu vô hại bị giữ | Vi phạm bị bắt |
+| Phương án | Vô hại bị giữ | Vi phạm bị bắt |
 | --- | --- | --- |
-| Sau khi xác nhận sentinel | 0,62 % | 100 % (1.720 / 1.720) |
-| + sentinel yếu tối đa flag, cổng tự tin theo intent | **0,04 %** | **100 %** |
-| Hỏi lại Jev ở case sát ngưỡng | 0,00 % | 100 %, nhưng tốn thêm 11 % lượt gọi: không dùng |
-| Realtime (`ReviewAsAudit`), toàn bộ dữ liệu | **0,02 %** bị chặn (1 / 4.189) | mọi câu trả lời có hại đều bị dừng |
+| Sau bước 4 | 0,62 % | 100 % (1.720) |
+| Sau bước 6 | **0,04 %** | **100 %** |
+| + hỏi lại ở case sát ngưỡng | 0,00 % | 100 %, +11 % lượt gọi (không dùng) |
+| Realtime (`ReviewAsAudit`) | **0,02 %** bị chặn (1 / 4.189) | mọi câu trả lời có hại bị dừng |
 
-**Hồi quy đơn lượt** (51 case có nhãn, chạy thật): không vi phạm có nhãn nào bị cho qua, trước cũng
-như sau; số case đúng nhãn 28 → 29.
-
-**Khả năng chịu nhiễu** (26 kịch bản giả lập, `examples/multiturn-contamination.jsonl`, mọi xác suất
-đều bị thêm nhiễu): với σ = 0,1 và τ = 0,5, giữ nhầm 0,9 % câu vô hại và bắt 100 % câu tiếp nối; với
-σ = 0,2 là 4,3 % và 97,2 %. τ = 0,5 là điểm cân bằng.
+**Nhiễu** (τ = 0,5): σ = 0,1 → giữ nhầm 0,9 %, bắt 100 % câu tiếp nối; σ = 0,2 → 4,3 %, 97,2 %.
+**Hồi quy:** 0 vi phạm có nhãn bị cho qua, trước và sau; số case đúng nhãn 28 → 29.
 
 ### Chạy lại
 
 ```bash
 cd go
-go test ./...                                   # unit test và kịch bản giả lập, không cần key
-
-export JEV_API_KEY=...
-LIVE_OUT=/tmp/mt go test -tags live -run TestLiveMultiturn -v ./          # 223 hội thoại
-LIVE_REVIEW=audit LIVE_OUT=/tmp/mt go test -tags live -run TestLiveMultiturn -v ./
-LIVE_POLICY_BEFORE=old.json go test -tags live -run TestLiveSingleTurnRegression -v ./
-
-REPLAY_DIRS='/tmp/mt*' go test -tags replay -run TestReplay -v ./          # offline, không cần key
+go test ./...                                                        # unit test và kịch bản giả lập
+JEV_API_KEY=... LIVE_OUT=/tmp/mt go test -tags live -run TestLiveMultiturn -v ./
+JEV_API_KEY=... LIVE_REVIEW=audit LIVE_OUT=/tmp/mt go test -tags live -run TestLiveMultiturn -v ./
+JEV_API_KEY=... LIVE_POLICY_BEFORE=old.json go test -tags live -run TestLiveSingleTurnRegression -v ./
+REPLAY_DIRS='/tmp/mt*' go test -tags replay -run TestReplay -v ./     # offline
 ```
-
-`LIVE_OUT` lưu lại mọi câu trả lời thô của Jev, là dữ liệu mà bước chấm lại offline đọc.
 
 ### Sử dụng
 
 ```go
-guard := guardrail.New(guardrail.Options{
-	ReviewHandling: guardrail.ReviewAsAudit, // chat realtime
-})
+guard := guardrail.New(guardrail.Options{ReviewHandling: guardrail.ReviewAsAudit})
 session := guardrail.NewSession(conversationID)
 
 in, _ := guard.CheckInput(ctx, message, &guardrail.CheckOptions{Session: session})
-session.Record("user", message, in)             // lượt bị giữ được lưu dạng placeholder
+session.Record("user", message, in)
 if !in.Deliverable() {
 	return safeResponse(in)
 }
-reply := callModel(session.ModelHistory(), message) // mô hình không bao giờ thấy lượt bị giữ
+reply := callModel(session.ModelHistory(), message)
 out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{Session: session, UserMessage: message})
 session.Record("assistant", reply, out)
 session.Advance()
-// out.Context cho biết kết quả đọc có ngữ cảnh; out.Audit cho biết cần đưa vào hàng đợi nào.
 ```
 
-`MultiturnFloor` giữ lại hành vi cũ cho hệ thống nào vẫn cần.
+`out.Context` chứa kết quả đọc có ngữ cảnh (`completes`, `disengages`, `attributed`); `out.Audit` là mức
+hậu kiểm. `Multiturn: MultiturnFloor` khôi phục thiết kế cũ.
 
 ### Giới hạn
 
-- Bộ vi phạm có nhãn mới có 30 câu, và không có mẫu `cse` thật nào, nên khả năng bắt vi phạm của cơ
-  chế xác nhận sentinel với `cse` chưa đo được. Các tín hiệu đó vẫn được ghi lại và hậu kiểm.
-- Một cuộc tấn công chia nhỏ mà các mảnh đầu không kích hoạt gì chỉ được đọc có ngữ cảnh sau khi kiểm
-  tra hội thoại nhận ra, trễ một lượt, như trước đây.
-- Trong session đang được theo dõi, mỗi câu trả lời tốn thêm một request tới Jev, gửi song song.
+- 30 câu vi phạm có nhãn; không có mẫu `cse` thật, nên recall của cơ chế xác nhận sentinel với `cse`
+  chưa đo được. Các tín hiệu đó vẫn được ghi lại để hậu kiểm.
+- Tấn công chia nhỏ mà các mảnh đầu không kích hoạt gì được đọc có ngữ cảnh trễ một lượt.
+- Session đang được theo dõi tốn thêm một request Jev cho mỗi câu trả lời, gửi song song.
 
 ---
 
