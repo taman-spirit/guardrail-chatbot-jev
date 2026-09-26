@@ -3,6 +3,27 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Python 1.1.0] - 2026-09-26
+
+### Changed
+
+- Multi-turn: a turn is held only for what it or its reply does. The input check never reads the
+  history; in a watched session the reply is also read in context, and those findings count only
+  when the reply completes an earlier harmful request. `multiturn="floor"` keeps the earlier floor.
+  The same engine ships in TypeScript and in the Go module, with the same decisions.
+- Withheld turns are kept as `[earlier message omitted]` (`Session.record`) and left out of
+  `Session.model_history()`; the session's risk is no longer sent to Jev.
+- `standard-v1`: sentinel corroboration, a confidence gate that respects benign intent, a cap for
+  conversations that are not escalating, `spc` judged per reply, and `ncr` / `iwp` descriptions
+  that exclude victims and questions about the law.
+
+### Added
+
+- `review_handling="audit"` (`reviewHandling: "audit"` in TypeScript) for realtime chat: only
+  `block` stops content, and every verdict carries an `audit` level.
+- `examples/multiturn-live.jsonl` (223 conversations) and `examples/multiturn-contamination.jsonl`
+  (26 scenarios).
+
 ## [Python 1.0.1] - 2026-09-23
 
 ### Changed

@@ -19,7 +19,19 @@
       "output": "fail_closed",
       "conversation": "fail_open"
     },
-    "error_action": "review"
+    "error_action": "review",
+    "sentinel_corroboration": {
+      "min_choice": 0.02,
+      "refusal": 0.8,
+      "refusal_max_sentinel": 0.5,
+      "refusal_except": ["sid", "prv", "ipv"],
+      "weak_at_most_flag": true,
+      "redact_instead_of_block_below": 0.8
+    },
+    "confidence_gate": {
+      "skip_when_intent": ["benign"],
+      "skip_min_confidence": 0.5
+    }
   },
   "severity_scale": [
     "none: nothing in the content touches the hazard",
@@ -69,7 +81,7 @@
     },
     "iwp": {
       "name": "Indiscriminate weapons (CBRNE)",
-      "description": "Chemical, biological, radiological, nuclear or high-yield explosive weapons: synthesis routes, agent selection, enhancement, weaponization or dispersal.",
+      "description": "Chemical, biological, radiological, nuclear or high-yield explosive weapons: synthesis routes, agent selection, enhancement, weaponization or dispersal. It is not a question about the law, the penalties, the history or the news of such weapons.",
       "refs": [
         "AILuminate iwp",
         "Llama Guard S9"
@@ -193,7 +205,7 @@
     },
     "ncr": {
       "name": "Non-violent crimes",
-      "description": "Fraud, scams, theft, drug trafficking, cybercrime, malware, money laundering or evading law enforcement.",
+      "description": "Fraud, scams, theft, drug trafficking, cybercrime, malware, money laundering or evading law enforcement. It is not a victim, or someone worried about becoming one, asking how to recognise, report or recover from fraud or a scam.",
       "refs": [
         "AILuminate ncr",
         "Llama Guard S2"
@@ -319,10 +331,7 @@
         "AILuminate spc_hlt / spc_fin",
         "Llama Guard S6"
       ],
-      "surfaces": [
-        "output",
-        "conversation"
-      ],
+      "surfaces": ["output"],
       "weight": 0.5,
       "base_severity": 2,
       "sentinel": false,
@@ -685,6 +694,13 @@
         "floor_action": "review",
         "add_finding": "pij"
       }
+    },
+    {
+      "id": "no-escalation-caps-conversation",
+      "when": {"signal": "escalation", "op": "<=", "value": 0.5},
+      "except_categories": ["cse", "ssh"],
+      "then": {"cap_action": "flag"},
+      "why": "A conversation that is not moving toward a harmful objective is not a multi-turn attack, whatever topics it has touched. Measured live, this halves the harmless conversations sent to review and keeps every escalation."
     }
   ],
   "action_ladder": [
