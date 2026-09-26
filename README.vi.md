@@ -292,8 +292,8 @@ tin nhắn bị chặn còn nằm trong mười tin nhắn gần nhất.
 | 1. Tin nhắn người dùng, đọc riêng | [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119) |
 | 2. Câu trả lời, đọc riêng | [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131) |
 | 3. Câu trả lời, đọc cùng các lượt trước, và có được tính không | [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333), [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350) |
-| Khi nào hội thoại được xem là vừa có dấu hiệu rủi ro | [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L75) |
-| Tin nhắn bị chặn giữ lại dạng placeholder, ẩn khỏi mô hình | [`Session.record`](python/src/guardrail_chatbot_jev/session.py#L67), [`model_history`](python/src/guardrail_chatbot_jev/session.py#L71) |
+| Khi nào hội thoại được xem là vừa có dấu hiệu rủi ro | [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L95) |
+| Tin nhắn bị chặn giữ lại dạng placeholder, ẩn khỏi mô hình | [`Session.record`](python/src/guardrail_chatbot_jev/session.py#L84), [`model_history`](python/src/guardrail_chatbot_jev/session.py#L91) |
 | Kiểm tra cả hội thoại: chỉ theo dõi và báo cáo, không bao giờ chặn một lượt | [`check_conversation`](python/src/guardrail_chatbot_jev/guard.py#L170) |
 | Hội thoại có rủi ro thì câu trả lời được gửi trọn vẹn, không stream từng phần | [`guard_stream`](python/src/guardrail_chatbot_jev/streaming.py#L74) |
 
@@ -405,7 +405,7 @@ risk_t+1  = max(δ · risk_t, ρ(hành động)),  δ = 0.5,  ρ = (0, 0.25, 0.6
 carry     = 2 lượt sau một verdict hội thoại ≥ review hoặc bất kỳ block nào
 ```
 
-Code: `V_in` [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119), `V_out` [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131), `W_t` [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L75), `V_ctx`, `c`, `d` [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333) / [`context_questions`](python/src/guardrail_chatbot_jev/questions.py#L135), `A_t`, `⊕` [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350), `risk` [`Session.observe`](python/src/guardrail_chatbot_jev/session.py#L93), `carry` [`Session.advance`](python/src/guardrail_chatbot_jev/session.py#L110)
+Code: `V_in` [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119), `V_out` [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131), `W_t` [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L95), `V_ctx`, `c`, `d` [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333) / [`context_questions`](python/src/guardrail_chatbot_jev/questions.py#L135), `A_t`, `⊕` [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350), `risk` [`Session.observe`](python/src/guardrail_chatbot_jev/session.py#L113), `carry` [`Session.advance`](python/src/guardrail_chatbot_jev/session.py#L130)
 
 ### Hiệu chỉnh đơn lượt
 
@@ -437,7 +437,7 @@ cổng tự tin:  conf < 0.65 ∧ (có phát hiện ∨ p ≥ θ_flag / 2) → r
 hội thoại:    escalation ≤ 0.5 → tối đa flag,  trừ cse, ssh
 ```
 
-Code: `u_k` [`decide`](python/src/guardrail_chatbot_jev/decide.py#L57), `never_below` [`_finding`](python/src/guardrail_chatbot_jev/decide.py#L219), weak [`decide`](python/src/guardrail_chatbot_jev/decide.py#L70), refusal [`_cap_uncorroborated_on_refusal`](python/src/guardrail_chatbot_jev/decide.py#L248), redact [`_redact_instead_of_block`](python/src/guardrail_chatbot_jev/decide.py#L273), gate [`_confidence_gate`](python/src/guardrail_chatbot_jev/decide.py#L381), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L700), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L32), [`spc`](policies/standard-v1.json#L328), [`ncr`](policies/standard-v1.json#L207), [`iwp`](policies/standard-v1.json#L83)
+Code: `u_k` [`decide`](python/src/guardrail_chatbot_jev/decide.py#L57), `never_below` [`_finding`](python/src/guardrail_chatbot_jev/decide.py#L219), weak [`decide`](python/src/guardrail_chatbot_jev/decide.py#L70), refusal [`_cap_uncorroborated_on_refusal`](python/src/guardrail_chatbot_jev/decide.py#L252), redact [`_redact_instead_of_block`](python/src/guardrail_chatbot_jev/decide.py#L277), gate [`_confidence_gate`](python/src/guardrail_chatbot_jev/decide.py#L385), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L700), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L32), [`spc`](policies/standard-v1.json#L328), [`ncr`](policies/standard-v1.json#L207), [`iwp`](policies/standard-v1.json#L83)
 
 Ngoài ra: `spc` chỉ chấm ở từng câu trả lời; mô tả `ncr` và `iwp` loại trừ người bị hại và câu hỏi về
 pháp luật.

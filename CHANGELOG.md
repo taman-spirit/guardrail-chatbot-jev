@@ -3,6 +3,31 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Python Viet Nam compliance 1.2.2] - 2026-09-26
+
+### Fixed
+
+- A request to hurt others is no longer answered as self-harm. The crisis route is taken only when
+  self-harm leads the turn: no other finding at a stronger action, or at the same action with a
+  higher probability. Measured on Jev, the self-harm sentinel answers 0.15 to 0.66 on requests to
+  build a bomb or bring down a building, and every one of seven such requests got the crisis reply;
+  now all seven get the violence reply, and all seven self-harm messages still get the crisis reply.
+  The verdict is unchanged: the content is still held. Includes Python 1.1.3.
+- After a withheld turn the chat model no longer guesses. `Responder.model_history(session, lang)`
+  replaces each withheld turn with a note naming its group (never its text) and the reply the user
+  was shown, so "do it" or "my first request" is answered in context. Jev still reads only the
+  neutral placeholder.
+
+### Added
+
+- `vietnam-compliance-v1` replies for violence and weapons, harm to children (hotline 111), crime,
+  sexually explicit content, hate, attempts on the system's safety settings and copyright, in
+  Vietnamese, English and Chinese. Misinformation answers with the Law on Cybersecurity reply.
+- `crisis_footer`: a line pointing to the crisis number, added to another group's reply when the
+  self-harm probability is still at or over its block band.
+- `withheld`: the note and per-group labels `Responder.model_history` uses.
+- The Go and Python responders pick the same verdict, group and text on 40,000 random answer sets.
+
 ## [Python Viet Nam compliance 1.2.1] - 2026-09-26
 
 ### Documentation

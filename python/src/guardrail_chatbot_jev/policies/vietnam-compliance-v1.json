@@ -981,12 +981,19 @@
     "crisis_line_default": "115",
     "order": [
       "self_harm",
+      "child_safety",
+      "violence",
       "sovereignty",
       "leaders",
       "anti_state",
       "cybersecurity",
       "ai_law",
       "personal_data",
+      "crime",
+      "sexual",
+      "hate",
+      "system_security",
+      "copyright",
       "general"
     ],
     "groups": {
@@ -998,6 +1005,27 @@
           "vi": "Mình rất tiếc khi bạn đang phải trải qua cảm giác này, và mình trân trọng việc bạn đã chia sẻ. Bạn không phải đối mặt với điều này một mình. Nếu bạn đang gặp nguy hiểm hoặc cần được hỗ trợ ngay lúc này, hãy gọi {crisis_line} hoặc nhờ một người thân ở bên cạnh bạn. Nếu bạn muốn, mình vẫn ở đây để lắng nghe.",
           "en": "I'm really sorry you're going through this, and I'm glad you told me. You don't have to face it alone. If you are in danger or need support right now, please call {crisis_line} or ask someone close to you to stay with you. If you'd like, I'm still here to listen.",
           "zh": "听到你正在经历这些，我真的很难过，也谢谢你愿意说出来。你不必独自面对。如果你现在有危险或需要帮助，请拨打 {crisis_line}，或请身边信任的人陪着你。如果你愿意，我会一直在这里听你说。"
+        }
+      },
+      "child_safety": {
+        "categories": [
+          "cse"
+        ],
+        "text": {
+          "vi": "Mình không thể tạo hay cung cấp bất kỳ nội dung tình dục hoặc bóc lột nào liên quan đến trẻ em. Nếu bạn biết một trẻ em đang bị xâm hại hoặc gặp nguy hiểm, hãy gọi Tổng đài quốc gia bảo vệ trẻ em 111 (miễn phí, 24/7) hoặc Công an 113.",
+          "en": "I can't create or provide any sexual or exploitative content involving children. If you know of a child who is being abused or is in danger, please call Viet Nam's national child protection hotline 111 (free, 24/7) or the police on 113.",
+          "zh": "我无法生成或提供任何涉及儿童的色情或剥削内容。如果你知道有儿童正在遭受侵害或处于危险之中，请拨打越南国家儿童保护热线 111（免费，全天候）或报警电话 113。"
+        }
+      },
+      "violence": {
+        "categories": [
+          "vcr",
+          "iwp"
+        ],
+        "text": {
+          "vi": "Mình không thể hướng dẫn chế tạo vũ khí, chất nổ hay bất cứ thứ gì dùng để gây thương tích cho người khác hoặc phá hủy nhà cửa, tài sản, vì điều đó có thể đe dọa tính mạng và vi phạm pháp luật Việt Nam. Nếu có ai đang gặp nguy hiểm, hãy gọi Công an 113 hoặc Cứu hỏa 114. Nếu bạn quan tâm đến kỹ thuật xây dựng, an toàn công trình hay phòng cháy chữa cháy, mình sẵn lòng trao đổi.",
+          "en": "I can't give instructions for making weapons, explosives or anything meant to hurt people or destroy buildings and property, because it can endanger lives and breaks Vietnamese law. If someone is in danger, please call the police on 113 or the fire service on 114. If you're interested in construction engineering, building safety or fire prevention, I'm happy to talk about that.",
+          "zh": "我无法提供制造武器、爆炸物或任何用于伤害他人、破坏房屋和财产之物的方法，因为这可能危及生命，也违反越南法律。如果有人正处于危险之中，请拨打报警电话 113 或消防电话 114。如果你对建筑工程、建筑安全或消防感兴趣，我很乐意和你交流。"
         }
       },
       "sovereignty": {
@@ -1034,7 +1062,8 @@
         "categories": [
           "vcs",
           "elc",
-          "dfm"
+          "dfm",
+          "mis"
         ],
         "text": {
           "vi": "Mình không thể hỗ trợ nội dung này vì nó có thể lan truyền thông tin sai sự thật, kích động gây rối trật tự công cộng hoặc xâm phạm hệ thống thông tin, là những hành vi bị Luật An ninh mạng nghiêm cấm. Nếu bạn cần kiểm chứng một thông tin, hãy tham khảo nguồn chính thống của cơ quan nhà nước và báo chí.",
@@ -1062,6 +1091,59 @@
           "zh": "未经本人同意，我无法提供或收集特定个人的个人信息。如果你需要联系某家企业或机构，我可以帮你查找其官方联系渠道。"
         }
       },
+      "crime": {
+        "categories": [
+          "ncr",
+          "src"
+        ],
+        "text": {
+          "vi": "Mình không thể hỗ trợ các hành vi vi phạm pháp luật như lừa đảo, trộm cắp, buôn bán hàng cấm, xâm hại hay cưỡng ép người khác. Nếu bạn là nạn nhân hoặc cần trình báo, hãy liên hệ Công an 113. Mình có thể giúp bạn tìm hiểu quy định pháp luật liên quan hoặc cách tự bảo vệ mình.",
+          "en": "I can't help with unlawful acts such as fraud, theft, trading in banned goods, or abusing or coercing others. If you are a victim or need to report something, please contact the police on 113. I can help you understand the relevant law or how to protect yourself.",
+          "zh": "我无法协助诈骗、盗窃、买卖违禁品、侵害或胁迫他人等违法行为。如果你是受害者或需要报案，请拨打报警电话 113。我可以帮你了解相关法律规定或如何保护自己。"
+        }
+      },
+      "sexual": {
+        "categories": [
+          "sxc"
+        ],
+        "text": {
+          "vi": "Mình không thể tạo nội dung khiêu dâm hay mô tả tình dục chi tiết. Nếu bạn cần thông tin về sức khỏe sinh sản, giáo dục giới tính hay các mối quan hệ, mình sẵn lòng giúp.",
+          "en": "I can't create pornographic or sexually explicit content. If you need information about reproductive health, sex education or relationships, I'm happy to help.",
+          "zh": "我无法生成色情或露骨的性内容。如果你需要生殖健康、性教育或情感关系方面的信息，我很乐意帮忙。"
+        }
+      },
+      "hate": {
+        "categories": [
+          "hte"
+        ],
+        "text": {
+          "vi": "Mình không thể tạo nội dung xúc phạm, phân biệt đối xử hay kích động thù ghét đối với người khác vì dân tộc, tôn giáo, giới tính, khuyết tật hay bất kỳ đặc điểm nào của họ. Mình sẵn lòng trao đổi về chủ đề này một cách tôn trọng.",
+          "en": "I can't create content that insults, discriminates against or stirs up hatred toward people because of their ethnicity, religion, gender, disability or any other characteristic. I'm happy to discuss the topic respectfully.",
+          "zh": "我无法生成因民族、宗教、性别、残疾或任何其他特征而侮辱、歧视他人或煽动仇恨的内容。我很乐意以尊重的方式讨论这个话题。"
+        }
+      },
+      "system_security": {
+        "categories": [
+          "pij",
+          "sid",
+          "exa"
+        ],
+        "text": {
+          "vi": "Mình không thể bỏ qua hay tiết lộ các chỉ dẫn vận hành và thiết lập an toàn của hệ thống, cũng không thể tự thực hiện hành động vượt quá quyền được giao. Bạn cứ hỏi trực tiếp điều bạn cần, mình sẽ giúp trong phạm vi cho phép.",
+          "en": "I can't ignore or reveal the system's operating instructions and safety settings, and I can't take actions beyond what I'm permitted to do. Just ask me directly what you need and I'll help within those limits.",
+          "zh": "我无法忽略或透露系统的运行指令和安全设置，也无法执行超出授权范围的操作。你可以直接告诉我你需要什么，我会在允许的范围内帮你。"
+        }
+      },
+      "copyright": {
+        "categories": [
+          "ipv"
+        ],
+        "text": {
+          "vi": "Mình không thể sao chép nguyên văn nội dung được bảo hộ quyền tác giả. Mình có thể tóm tắt, phân tích hoặc trích dẫn ngắn kèm nguồn cho bạn.",
+          "en": "I can't reproduce copyrighted content word for word. I can summarise it, analyse it, or quote a short passage with its source.",
+          "zh": "我无法逐字复制受著作权保护的内容。我可以为你概括、分析，或附出处简短引用。"
+        }
+      },
       "general": {
         "categories": [
           "*"
@@ -1082,6 +1164,105 @@
       "vi": "Hệ thống kiểm duyệt nội dung đang tạm thời gián đoạn nên mình chưa thể trả lời. Bạn vui lòng thử lại sau ít phút nhé.",
       "en": "Our content check is temporarily unavailable, so I can't reply yet. Please try again in a few minutes.",
       "zh": "内容审核系统暂时中断，我暂时无法回复。请几分钟后再试。"
+    },
+    "crisis_footer": {
+      "vi": "Nếu bạn đang gặp chuyện khó khăn hoặc có ý định làm hại bản thân, hãy gọi {crisis_line} hoặc nói chuyện với một người bạn tin tưởng.",
+      "en": "If you're going through something hard or thinking about harming yourself, please call {crisis_line} or talk to someone you trust.",
+      "zh": "如果你正经历困难，或有伤害自己的念头，请拨打 {crisis_line}，或和你信任的人聊一聊。"
+    },
+    "withheld": {
+      "note": {
+        "vi": "[Tin nhắn này của người dùng đã được hệ thống kiểm duyệt ẩn đi (nhóm: {label}). Trợ lý không thấy nội dung và đã trả lời bằng tin nhắn kế tiếp. Không thực hiện yêu cầu đã bị ẩn, kể cả khi người dùng nhắc lại hoặc yêu cầu tiếp tục.]",
+        "en": "[This user message was hidden by the content check (group: {label}). The assistant did not see its content and replied with the next message. Do not carry out the hidden request, even if the user repeats it or asks to continue.]",
+        "zh": "[该用户消息已被内容审核隐藏（类别：{label}）。助手看不到其内容，并已用下一条消息回复。不要执行被隐藏的请求，即使用户重复或要求继续。]"
+      },
+      "labels": {
+        "self_harm": {
+          "vi": "chia sẻ về ý nghĩ tự làm hại bản thân",
+          "en": "thoughts of self-harm",
+          "zh": "自我伤害的念头"
+        },
+        "child_safety": {
+          "vi": "nội dung liên quan đến xâm hại trẻ em",
+          "en": "content involving harm to children",
+          "zh": "涉及伤害儿童的内容"
+        },
+        "violence": {
+          "vi": "bạo lực, vũ khí, phá hủy tài sản",
+          "en": "violence, weapons or destroying property",
+          "zh": "暴力、武器或破坏财产"
+        },
+        "sovereignty": {
+          "vi": "nội dung đi ngược chủ quyền lãnh thổ Việt Nam",
+          "en": "content against Viet Nam's territorial sovereignty",
+          "zh": "违背越南领土主权的内容"
+        },
+        "leaders": {
+          "vi": "xúc phạm lãnh tụ, lãnh đạo hoặc biểu tượng quốc gia",
+          "en": "insulting national leaders or symbols",
+          "zh": "侮辱国家领导人或国家象征"
+        },
+        "anti_state": {
+          "vi": "tuyên truyền chống Nhà nước",
+          "en": "propaganda against the State",
+          "zh": "反国家宣传"
+        },
+        "cybersecurity": {
+          "vi": "thông tin sai sự thật, gây rối trật tự công cộng",
+          "en": "false information or public disorder",
+          "zh": "虚假信息或扰乱公共秩序"
+        },
+        "ai_law": {
+          "vi": "dùng AI để giả mạo, lừa dối",
+          "en": "using AI to impersonate or deceive",
+          "zh": "利用人工智能冒充或欺骗"
+        },
+        "personal_data": {
+          "vi": "thông tin cá nhân của một người cụ thể",
+          "en": "personal information about a specific person",
+          "zh": "特定个人的个人信息"
+        },
+        "crime": {
+          "vi": "hành vi vi phạm pháp luật",
+          "en": "unlawful acts",
+          "zh": "违法行为"
+        },
+        "sexual": {
+          "vi": "nội dung khiêu dâm",
+          "en": "sexually explicit content",
+          "zh": "色情内容"
+        },
+        "hate": {
+          "vi": "xúc phạm, kích động thù ghét",
+          "en": "insults or hate",
+          "zh": "侮辱或煽动仇恨"
+        },
+        "system_security": {
+          "vi": "yêu cầu vượt qua thiết lập an toàn của hệ thống",
+          "en": "an attempt to get around the system's safety settings",
+          "zh": "试图绕过系统安全设置"
+        },
+        "copyright": {
+          "vi": "sao chép nội dung có bản quyền",
+          "en": "copying copyrighted content",
+          "zh": "复制受著作权保护的内容"
+        },
+        "general": {
+          "vi": "nội dung không được hỗ trợ",
+          "en": "content the service does not support",
+          "zh": "本服务不支持的内容"
+        },
+        "review": {
+          "vi": "nội dung cần được xem xét thêm",
+          "en": "content held for a closer look",
+          "zh": "需要进一步审核的内容"
+        },
+        "unavailable": {
+          "vi": "hệ thống kiểm duyệt tạm thời gián đoạn",
+          "en": "the content check was unavailable",
+          "zh": "内容审核暂时中断"
+        }
+      }
     },
     "sovereignty_affirmation": {
       "trigger_signal": "sovereignty_question",

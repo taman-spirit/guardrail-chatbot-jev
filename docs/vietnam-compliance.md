@@ -49,19 +49,24 @@ unchanged from `standard-v1`.
 Python:
 
 ```python
-from guardrail_chatbot_jev import Guard, Responder, detect_language
+from guardrail_chatbot_jev import Guard, Responder, Session, detect_language
 
 guard = Guard("vietnam-compliance-v1")
 responder = Responder(guard.policy)          # default support line: 115
 
-def handle(message: str) -> str:
+def handle(session: Session, message: str) -> str:   # one session per conversation
     lang = detect_language(message)          # "vi", "en" or "zh"
-    verdict_in = guard.check_input(message)
+    verdict_in = guard.check_input(message, session=session)
+    session.record("user", message, verdict_in)
     if held := responder.blocking_response([verdict_in], language=lang):
+        session.advance()
         return held
-    reply = call_model(message)
-    verdict_out = guard.check_output(reply, user_message=message)
-    return responder.compose(reply, [verdict_in, verdict_out], language=lang)
+    reply = call_model(responder.model_history(session, lang))   # withheld turns become a note naming the group
+    verdict_out = guard.check_output(reply, user_message=message, session=session)
+    sent = responder.compose(reply, [verdict_in, verdict_out], language=lang)
+    session.record("assistant", sent, verdict_out)
+    session.advance()
+    return sent
 ```
 
 Go (ships in release `go-vietnam-compliance-v1`, module `v1.1.0` and later):
@@ -70,15 +75,21 @@ Go (ships in release `go-vietnam-compliance-v1`, module `v1.1.0` and later):
 policy, _ := guardrail.BundledPolicy("vietnam-compliance-v1")
 guard := guardrail.New(guardrail.Options{Policy: policy})
 responder, _ := guardrail.NewResponder(policy, "") // "" = 115
+session := guardrail.NewSession(conversationID) // one session per conversation
 
 lang := guardrail.DetectLanguage(message)
-in, _ := guard.CheckInput(ctx, message, nil)
+in, _ := guard.CheckInput(ctx, message, &guardrail.CheckOptions{Session: session})
+session.Record("user", message, in)
 if held, ok := responder.BlockingResponse([]guardrail.Verdict{in}, lang); ok {
+	session.Advance()
 	return held
 }
-reply := callModel(message)
-out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{UserMessage: message})
-return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
+reply := callModel(responder.ModelHistory(session, lang)) // withheld turns become a note naming the group
+out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{Session: session, UserMessage: message})
+sent := responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
+session.Record("assistant", sent, out)
+session.Advance()
+return sent
 ```
 
 ## Step 5. Use the prewritten replies; never let the model write them
@@ -94,6 +105,15 @@ return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
    `Responder(policy, crisis_line="...")`.
 5. Content held for a person gets a neutral notice that does not accuse the user of anything.
 6. When the content check is down, the user is told so rather than accused.
+7. The reply names what actually stopped the content: violence and weapons, harm to children,
+   crime, sexually explicit content, hate, getting around the safety settings, copyright, and the
+   groups under Vietnamese law. The crisis reply is used only when self-harm **leads**. A request to
+   build something that destroys a building gets the violence reply; if the self-harm signal is
+   still over its block band, the reply adds one line pointing to **115**.
+8. After a withheld turn, send the model `responder.model_history(session, lang)` (Go: `responder.ModelHistory`) rather than the raw
+   history. A withheld turn becomes a note naming its group (never its text) followed by the reply
+   the user was shown. When the user then says "do it" or "my first request", the model knows what
+   it declined instead of guessing or saying it cannot see the message.
 
 ## Step 6. Do not block ordinary questions
 

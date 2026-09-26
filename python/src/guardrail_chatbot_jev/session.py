@@ -48,13 +48,30 @@ class Session:
     verdicts: list[Verdict] = field(default_factory=list)
     _floor: Action = "allow"
     _floor_left: int = 0
+    # Runs beside ``turns``: the verdict that withheld each turn, or None. ``record`` sets it and
+    # ``Responder.model_history`` reads it; when ``turns`` is edited directly the two stop matching
+    # and withheld turns are then told without their group.
+    _held: list[Verdict | None] = field(default_factory=list, repr=False, compare=False)
 
     # -- transcript ---------------------------------------------------
 
     def add_turn(self, role: str, content: str) -> None:
+        self._add_turn(role, content, None)
+
+    def _add_turn(self, role: str, content: str, held: Verdict | None) -> None:
+        if len(self._held) != len(self.turns):
+            self._held = [None] * len(self.turns)
         self.turns.append(Turn(role=role, content=content))  # type: ignore[arg-type]
+        self._held.append(held)
         if len(self.turns) > self.max_turns:
             del self.turns[: len(self.turns) - self.max_turns]
+            del self._held[: len(self._held) - self.max_turns]
+
+    def held_verdict(self, index: int) -> Verdict | None:
+        """The verdict that withheld turn ``index``, or None when unknown."""
+        if len(self._held) != len(self.turns) or not 0 <= index < len(self._held):
+            return None
+        return self._held[index]
 
     def extend(self, turns: Sequence[Any]) -> None:
         for turn in as_turns(turns):
@@ -66,7 +83,10 @@ class Session:
 
     def record(self, role: str, content: str, verdict: Verdict) -> None:
         """Append a turn given the verdict on it; a withheld turn is kept as the placeholder."""
-        self.add_turn(role, content if verdict.deliverable else WITHHELD_PLACEHOLDER)
+        if verdict.deliverable:
+            self._add_turn(role, content, None)
+        else:
+            self._add_turn(role, WITHHELD_PLACEHOLDER, verdict)
 
     def model_history(self) -> tuple[Turn, ...]:
         """The transcript for the chat model: withheld turns are left out entirely."""

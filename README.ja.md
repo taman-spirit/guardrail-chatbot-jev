@@ -276,8 +276,8 @@ finding）。
 | 1. ユーザーのメッセージを単独で読む | [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119) |
 | 2. 応答を単独で読む | [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131) |
 | 3. 応答を以前のターンと一緒に読み、効くかを判断する | [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333), [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350) |
-| 会話が「最近リスクあり」とみなされる条件 | [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L75) |
-| 止めたメッセージを印として残し、モデルから隠す | [`Session.record`](python/src/guardrail_chatbot_jev/session.py#L67), [`model_history`](python/src/guardrail_chatbot_jev/session.py#L71) |
+| 会話が「最近リスクあり」とみなされる条件 | [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L95) |
+| 止めたメッセージを印として残し、モデルから隠す | [`Session.record`](python/src/guardrail_chatbot_jev/session.py#L84), [`model_history`](python/src/guardrail_chatbot_jev/session.py#L91) |
 | 会話全体のチェック：監視と報告のみで、ターンは止めない | [`check_conversation`](python/src/guardrail_chatbot_jev/guard.py#L170) |
 
 ### ターンごとの例
@@ -368,7 +368,7 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-コード：`V_in` [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119), `V_out` [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131), `W_t` [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L75), `V_ctx`, `c`, `d` [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333) / [`context_questions`](python/src/guardrail_chatbot_jev/questions.py#L135), `A_t`, `⊕` [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350), `risk` [`Session.observe`](python/src/guardrail_chatbot_jev/session.py#L93), `carry` [`Session.advance`](python/src/guardrail_chatbot_jev/session.py#L110)
+コード：`V_in` [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119), `V_out` [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131), `W_t` [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L95), `V_ctx`, `c`, `d` [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333) / [`context_questions`](python/src/guardrail_chatbot_jev/questions.py#L135), `A_t`, `⊕` [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350), `risk` [`Session.observe`](python/src/guardrail_chatbot_jev/session.py#L113), `carry` [`Session.advance`](python/src/guardrail_chatbot_jev/session.py#L130)
 
 ### 単一ターンの較正
 
@@ -395,7 +395,7 @@ confidence gate:  conf < 0.65 ∧ (finding ∨ p ≥ θ_flag / 2) → review,  u
 conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
 ```
 
-コード：`u_k` [`decide`](python/src/guardrail_chatbot_jev/decide.py#L57), `never_below` [`_finding`](python/src/guardrail_chatbot_jev/decide.py#L219), weak [`decide`](python/src/guardrail_chatbot_jev/decide.py#L70), refusal [`_cap_uncorroborated_on_refusal`](python/src/guardrail_chatbot_jev/decide.py#L248), redact [`_redact_instead_of_block`](python/src/guardrail_chatbot_jev/decide.py#L273), gate [`_confidence_gate`](python/src/guardrail_chatbot_jev/decide.py#L381), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L700), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L32), [`spc`](policies/standard-v1.json#L328), [`ncr`](policies/standard-v1.json#L207), [`iwp`](policies/standard-v1.json#L83)
+コード：`u_k` [`decide`](python/src/guardrail_chatbot_jev/decide.py#L57), `never_below` [`_finding`](python/src/guardrail_chatbot_jev/decide.py#L219), weak [`decide`](python/src/guardrail_chatbot_jev/decide.py#L70), refusal [`_cap_uncorroborated_on_refusal`](python/src/guardrail_chatbot_jev/decide.py#L252), redact [`_redact_instead_of_block`](python/src/guardrail_chatbot_jev/decide.py#L277), gate [`_confidence_gate`](python/src/guardrail_chatbot_jev/decide.py#L385), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L700), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L32), [`spc`](policies/standard-v1.json#L328), [`ncr`](policies/standard-v1.json#L207), [`iwp`](policies/standard-v1.json#L83)
 
 ### リアルタイムでのレビュー
 

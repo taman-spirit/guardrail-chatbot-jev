@@ -24,7 +24,8 @@ from dataclasses import dataclass
 from typing import Any, Iterable, Mapping
 
 from .policy import Policy
-from .types import Verdict, rank
+from .session import WITHHELD_PLACEHOLDER, Session
+from .types import Turn, Verdict, rank
 
 _CJK = re.compile(r"[㐀-鿿]")
 _VIETNAMESE = re.compile(
@@ -69,6 +70,7 @@ class Responder:
         if not isinstance(spec, Mapping):
             raise ValueError(f"policy {policy.id!r} has no responses section")
         self.spec = spec
+        self.policy = policy
         self.languages: tuple[str, ...] = tuple(spec.get("languages") or ("vi",))
         self.default_language: str = str(spec.get("default_language") or self.languages[0])
         self.crisis_line = crisis_line or str(spec.get("crisis_line_default") or "")
@@ -130,19 +132,77 @@ class Responder:
             text = self._group_text(group, language)
         else:
             group = self._group_for(held)
-            if verdict.route == "human_review" and group != "self_harm":
+            if verdict.route == "human_review":
                 # Held for a person, not refused: telling the user they broke the law before
                 # anyone has looked would be the wrong message for a borderline case.
                 group, text = "review", self._text(self.spec.get("review") or {}, language)
             else:
                 text = self._group_text(group, language)
+            # Self-harm that reached its block band without leading the turn, beside a request to
+            # hurt others, still gets the number to call: the reply names what stopped the content,
+            # and the line is there in case the person is also at risk.
+            footer = self._crisis_footer(held, language)
+            if footer:
+                text = f"{text}\n\n{footer}"
 
         # A group with an affirmation ends every path it is part of, including a held review.
         if affirm and group != "self_harm":
             text = f"{text}\n\n{self.affirmation(language)}"
         return Choice(group, text, affirm and group != "self_harm")
 
+    def model_history(self, session: Session, language: str | None = None) -> tuple[Turn, ...]:
+        """The session's transcript for the chat model, with each withheld turn told rather than
+        dropped.
+
+        A withheld user message becomes a note naming its group, followed by the reply the user was
+        shown; a withheld reply becomes the reply the user was shown. ``Session.model_history`` drops
+        withheld turns, so after a refusal the model meets "do it" or "my first request" with nothing
+        before it, and guesses. The note names the group, never the text, so the model knows what it
+        declined without being able to act on it.
+        """
+        out: list[Turn] = []
+        turns = session.turns
+        for i, turn in enumerate(turns):
+            if turn.content != WITHHELD_PLACEHOLDER:
+                out.append(Turn(role=turn.role, content=turn.content))
+                continue
+            held = session.held_verdict(i)
+            choice = self.choose([held] if held is not None else [], language)
+            if choice is None or choice.group == "affirmation":
+                # A turn recorded without its verdict, or one that is not withheld after all.
+                choice = Choice("general", self._group_text("general", language), False)
+            if turn.role != "user":
+                out.append(Turn(role=turn.role, content=choice.text))
+                continue
+            withheld = self.spec.get("withheld") or {}
+            label = self._text((withheld.get("labels") or {}).get(choice.group) or {}, language)
+            note = self._text(withheld.get("note") or {}, language).replace("{label}", label)
+            out.append(Turn(role="user", content=note))
+            if i + 1 >= len(turns) or turns[i + 1].role != "assistant":
+                out.append(Turn(role="assistant", content=choice.text))
+        return tuple(out)
+
     # -- internals ------------------------------------------------------
+
+    def _crisis_footer(self, held: list[Verdict], language: str | None) -> str:
+        """The crisis line to add to a reply that is not the crisis reply.
+
+        Added when a held verdict carries a self-harm probability at or over its own block band. The
+        band is read from the probability, not the finding's action: a rule that hardens every
+        finding on a request for capability lifts a self-harm answer of 0.15 to block on "how do I
+        bring down a bridge", and a crisis line under every refusal would be noise.
+        """
+        self_harm = set(self._groups["self_harm"].get("categories") or ())
+        for verdict in held:
+            for finding in verdict.findings:
+                if finding.category not in self_harm or rank(finding.action) < rank("flag"):
+                    continue
+                category = self.policy.categories.get(finding.category)
+                bands = category.threshold(verdict.surface) if category is not None else {}
+                if "block" in bands and finding.probability >= bands["block"]:
+                    footer = self._text(self.spec.get("crisis_footer") or {}, language)
+                    return footer.replace("{crisis_line}", self.crisis_line)
+        return ""
 
     def _group_for(self, verdicts: list[Verdict]) -> str:
         """The group of the finding that caused the hold, with ``order`` only breaking ties.
@@ -155,6 +215,9 @@ class Responder:
             top = max(rank(f.action) for f in findings)
             fired = {f.category for f in findings if rank(f.action) == top}
             for name in self._order:
+                # The crisis reply comes only from the crisis route, which is set when self-harm leads.
+                if name == "self_harm":
+                    continue
                 if fired.intersection(self._groups[name].get("categories") or ()):
                     return name
         for name in self._order:
@@ -200,6 +263,18 @@ def _check(responder: Responder) -> None:
     if "self_harm" not in responder._groups:
         # The crisis route answers from this group directly, whether or not it is in order.
         missing.append("group 'self_harm' is not defined")
+    if "general" not in responder._groups:
+        missing.append("group 'general' is not defined")
+    withheld = spec.get("withheld") or {}
+    labelled = sorted({*responder._order, "self_harm", "general", "review", "unavailable"})
+    for lang in responder.languages:
+        if not (spec.get("crisis_footer") or {}).get(lang):
+            missing.append(f"crisis_footer.{lang}")
+        if not (withheld.get("note") or {}).get(lang):
+            missing.append(f"withheld.note.{lang}")
+        for name in labelled:
+            if not ((withheld.get("labels") or {}).get(name) or {}).get(lang):
+                missing.append(f"withheld.labels.{name}.{lang}")
     for key in ("review", "unavailable"):
         for lang in responder.languages:
             if not (spec.get(key) or {}).get(lang):
