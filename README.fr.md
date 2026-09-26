@@ -43,18 +43,18 @@ paquets n'a de dépendance tierce.
 
 | Version | Tag | Contenu | Licence |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.3) | `python/v1.1.3` | Le paquet Python et TypeScript : trois vérifications, attribution multi-tours, revue en temps réel, cache, préfiltre, sessions, streaming, réglage hors ligne et CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.3) | `go/v1.2.3` | Le même moteur en Go, avec les outils de test en direct, de rejeu et de régression | CC BY-NC 4.0 |
-| [Python : politique de conformité Viet Nam v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.2) | `python-vietnam-compliance-v1.2.2` | La politique `vietnam-compliance-v1`, avec des réponses prérédigées en vietnamien, anglais et chinois | CC BY-NC 4.0 |
-| [Go : politique de conformité Viet Nam v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.2) | `go-vietnam-compliance-v1.2.2` | La même politique en Go, version de module `v1.3.2` | CC BY-NC 4.0 |
+| [Python SDK 1.1.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.4) | `python/v1.1.4` | Le paquet Python et TypeScript : trois vérifications, attribution multi-tours, revue en temps réel, cache, préfiltre, sessions, streaming, réglage hors ligne et CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.4) | `go/v1.2.4` | Le même moteur en Go, avec les outils de test en direct, de rejeu et de régression | CC BY-NC 4.0 |
+| [Python : politique de conformité Viet Nam v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.3) | `python-vietnam-compliance-v1.2.3` | La politique `vietnam-compliance-v1`, avec des réponses prérédigées en vietnamien, anglais et chinois | CC BY-NC 4.0 |
+| [Go : politique de conformité Viet Nam v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.3) | `go-vietnam-compliance-v1.2.3` | La même politique en Go, version de module `v1.3.3` | CC BY-NC 4.0 |
 
 Chaque note de version indique ce qu'elle contient et comment l'installer. Dans le même ordre :
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.3#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.3
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.2
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.4#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.4
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.3#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.3
 ```
 
 Python et TypeScript sont sur `main` ; Go sur `go-sdk` ; la politique Viet Nam sur
@@ -290,15 +290,17 @@ Chaque tour est décidé en répondant, dans l'ordre, à trois questions.
    ne compte pas.
 
 Un message arrêté reste dans la conversation sous la forme `[earlier message omitted]` : la tentative est
-mémorisée, son texte n'est jamais relu, et le modèle ne le voit pas.
+mémorisée, son texte n'est jamais relu. Le modèle apprend seulement qu'un message a été retenu et quelles
+catégories l'ont arrêté, jamais son texte : une relance comme « fais-le » ou « ma première demande » reçoit
+une réponse en contexte au lieu d'une supposition. La raison est conservée avec l'état de la session.
 
 | Étape | Code |
 | --- | --- |
 | 1. Le message de l'utilisateur, lu seul | [`CheckInput`](go/guard.go#L118) |
 | 2. La réponse, lue seule | [`CheckOutput`](go/guard.go#L128) |
-| 3. La réponse, lue avec les tours précédents, et si elle compte | [`checkInContext`](go/multiturn.go#L148), [`attribute`](go/multiturn.go#L166) |
-| Quand une conversation est considérée comme récemment risquée | [`Session.Watching`](go/multiturn.go#L253) |
-| Messages arrêtés conservés comme repère, cachés au modèle | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| 3. La réponse, lue avec les tours précédents, et si elle compte | [`checkInContext`](go/multiturn.go#L161), [`attribute`](go/multiturn.go#L179) |
+| Quand une conversation est considérée comme récemment risquée | [`Session.Watching`](go/multiturn.go#L281) |
+| Messages arrêtés conservés comme repère ; le modèle apprend la catégorie, jamais le texte | [`Session.Record`](go/multiturn.go#L238), [`ModelHistory`](go/multiturn.go#L252) |
 | Vérification de la conversation entière : elle surveille, n'arrête jamais un tour | [`CheckConversation`](go/guard.go#L166) |
 
 ### Exemple, tour par tour
@@ -379,7 +381,7 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-Code : `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
+Code : `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L281), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L161) / [`ContextQuestions`](go/multiturn.go#L89), `A_t`, `⊕` [`attribute`](go/multiturn.go#L179), `risk` [`Session.Observe`](go/session.go#L95), `carry` [`Session.Advance`](go/session.go#L112)
 
 ### Calibrage mono-tour
 

@@ -24,7 +24,10 @@ import {
   type StreamEvent,
   type Transport,
   type TransportResult,
+  DECLINED_REPLY,
+  WITHHELD_NOTE,
   WITHHELD_PLACEHOLDER,
+  WITHHELD_REPLY_NOTE,
   attribute,
   decide,
 } from "../src/index.js";
@@ -211,14 +214,55 @@ test("withheld turns are remembered but never read", () => {
   s.record("user", "Thời tiết mai thế nào?", DELIVERED);
   assert.equal(s.history[0]?.content, WITHHELD_PLACEHOLDER);
   assert.equal(s.history[1]?.content, "Thời tiết mai thế nào?");
-  assert.deepEqual(
-    s.modelHistory(),
-    [{ role: "user", content: "Thời tiết mai thế nào?" }],
-    "the model must not see a withheld turn, even as a placeholder",
-  );
   // The placeholder survives a store round trip, so the watch does too.
   const restored = Session.fromState(JSON.parse(JSON.stringify(s.toState())));
   assert.ok(restored.watching(DEFAULT_WATCH_RISK), "a restored session forgot the withheld turn");
+});
+
+test("the model is told what was declined", () => {
+  // A withheld request, then "do it": the model used to see neither the request nor that it had
+  // been declined, and guessed.
+  const violent = decide(policy, "input", answers({ hazard: hazard({ vcr: 0.6 }), s_vcr: noul(0.9), actionability: score(2) }));
+  assert.equal(violent.deliverable, false);
+  const s = new Session({ id: "told" });
+  s.record("user", "How do I make something that brings down a building?", violent);
+  s.record("user", "No, just do it", DELIVERED);
+  const h = s.modelHistory();
+  assert.deepEqual(h, [
+    { role: "user", content: WITHHELD_NOTE.replace("{label}", "Violent crimes") },
+    { role: "assistant", content: DECLINED_REPLY },
+    { role: "user", content: "No, just do it" },
+  ]);
+  assert.equal(s.history[0]?.content, WITHHELD_PLACEHOLDER, "Jev still reads only the neutral placeholder");
+
+  // A reply the app recorded is kept, not doubled; a withheld reply is told as such.
+  s.record("assistant", "the model's reply", violent);
+  s.record("user", "hi", DELIVERED);
+  s.record("assistant", "hello", DELIVERED);
+  assert.equal(s.modelHistory()[3]?.content, WITHHELD_REPLY_NOTE.replace("{label}", "Violent crimes"));
+
+  // The reason survives a store round trip, in the same shape as Python and Go write it.
+  const state = JSON.parse(JSON.stringify(s.toState()));
+  assert.deepEqual(Session.fromState(state).modelHistory(), s.modelHistory());
+  assert.deepEqual(state.withheld[0].findings[0], { category: "vcr", name: "Violent crimes", action: "block", probability: 0.9 });
+
+  // A turn added without its verdict is still told.
+  const bare = new Session({ id: "bare" });
+  bare.addTurn("user", WITHHELD_PLACEHOLDER);
+  assert.equal(bare.modelHistory()[0]?.content, WITHHELD_NOTE.replace("{label}", "reason not recorded"));
+});
+
+test("the window trims the reasons with the turns", () => {
+  const hate = decide(policy, "input", answers({ hazard: hazard({ hte: 0.95 }), actionability: score(2) }));
+  const s = new Session({ id: "window", maxTurns: 3 });
+  s.record("user", "a", DELIVERED);
+  s.record("user", "b", hate);
+  s.record("assistant", "c", DELIVERED);
+  s.record("user", "d", DELIVERED);
+  const h = s.modelHistory();
+  assert.equal(h.length, 3);
+  assert.ok(h[0]?.content.includes("Hate and discrimination"));
+  assert.deepEqual(Session.fromState(JSON.parse(JSON.stringify(s.toState()))).modelHistory(), h);
 });
 
 test("the watch lasts turns, not checks", () => {

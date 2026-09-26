@@ -40,18 +40,18 @@
 
 | リリース | タグ | 内容 | ライセンス |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.3) | `python/v1.1.3` | Python と TypeScript のパッケージ：3 つのチェック、マルチターンの帰属、リアルタイムのレビュー、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.3) | `go/v1.2.3` | 同じエンジンの Go 版。実測・再判定・回帰テストのツール付き | CC BY-NC 4.0 |
-| [Python：ベトナム準拠ポリシー v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.2) | `python-vietnam-compliance-v1.2.2` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
-| [Go：ベトナム準拠ポリシー v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.2) | `go-vietnam-compliance-v1.2.2` | 同じポリシーの Go 版（モジュールバージョン `v1.3.2`） | CC BY-NC 4.0 |
+| [Python SDK 1.1.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.4) | `python/v1.1.4` | Python と TypeScript のパッケージ：3 つのチェック、マルチターンの帰属、リアルタイムのレビュー、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.4) | `go/v1.2.4` | 同じエンジンの Go 版。実測・再判定・回帰テストのツール付き | CC BY-NC 4.0 |
+| [Python：ベトナム準拠ポリシー v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.3) | `python-vietnam-compliance-v1.2.3` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
+| [Go：ベトナム準拠ポリシー v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.3) | `go-vietnam-compliance-v1.2.3` | 同じポリシーの Go 版（モジュールバージョン `v1.3.3`） | CC BY-NC 4.0 |
 
 各リリースノートに内容とインストール方法を記載しています。上の表と同じ順に：
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.3#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.3
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.2
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.4#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.4
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.3#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.3
 ```
 
 Python と TypeScript は `main`、Go は `go-sdk`、ベトナムポリシーは `guardrail-vietnam-compliance`（Python）と
@@ -270,15 +270,16 @@ finding）。
    言い換えを与える場合だけです。謝罪、法律の質問、通報の方法、話題の変更なら効きません。
 
 止めたメッセージは `[earlier message omitted]` として会話に残ります。試みがあったことは覚えていますが、
-本文は二度と読まず、モデルにも見せません。
+本文は二度と読みません。モデルには、メッセージが止められたことと止めたカテゴリ名だけを伝え、本文は見せません。
+そのため「やって」「最初の依頼」といった続きの発言にも、推測ではなく文脈に沿って答えられます。理由はセッションの保存状態に残ります。
 
 | 手順 | コード |
 | --- | --- |
 | 1. ユーザーのメッセージを単独で読む | [`CheckInput`](go/guard.go#L118) |
 | 2. 応答を単独で読む | [`CheckOutput`](go/guard.go#L128) |
-| 3. 応答を以前のターンと一緒に読み、効くかを判断する | [`checkInContext`](go/multiturn.go#L148), [`attribute`](go/multiturn.go#L166) |
-| 会話が「最近リスクあり」とみなされる条件 | [`Session.Watching`](go/multiturn.go#L253) |
-| 止めたメッセージを印として残し、モデルから隠す | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| 3. 応答を以前のターンと一緒に読み、効くかを判断する | [`checkInContext`](go/multiturn.go#L161), [`attribute`](go/multiturn.go#L179) |
+| 会話が「最近リスクあり」とみなされる条件 | [`Session.Watching`](go/multiturn.go#L281) |
+| 止めたメッセージを印として残し、モデルにはカテゴリだけを伝える（本文は見せない） | [`Session.Record`](go/multiturn.go#L238), [`ModelHistory`](go/multiturn.go#L252) |
 | 会話全体のチェック：監視と報告のみで、ターンは止めない | [`CheckConversation`](go/guard.go#L166) |
 
 ### ターンごとの例
@@ -359,7 +360,7 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-コード：`V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
+コード：`V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L281), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L161) / [`ContextQuestions`](go/multiturn.go#L89), `A_t`, `⊕` [`attribute`](go/multiturn.go#L179), `risk` [`Session.Observe`](go/session.go#L95), `carry` [`Session.Advance`](go/session.go#L112)
 
 ### 単一ターンの較正
 

@@ -10,6 +10,34 @@
 import { WITHHELD_PLACEHOLDER } from "./multiturn.js";
 import { LADDER, type Action, type Turn, type Verdict, rank, stronger } from "./types.js";
 
+/**
+ * What `modelHistory` tells the chat model in place of a withheld user message. `{label}` is the
+ * names of the categories that stopped it; the message's text is never included.
+ */
+export const WITHHELD_NOTE =
+  "[The user's message here was withheld by the content check ({label}). The assistant did not see " +
+  "it and declined. Do not carry out the withheld request, even if the user repeats it or asks to " +
+  "continue.]";
+/** What `modelHistory` tells the chat model in place of a withheld reply. */
+export const WITHHELD_REPLY_NOTE =
+  "[The assistant's reply here was withheld by the content check ({label}); the user did not see it.]";
+/** The assistant turn `modelHistory` adds after a withheld user message when none was recorded. */
+export const DECLINED_REPLY = "I can't help with that request.";
+
+/**
+ * What a store keeps of a withheld turn's verdict: enough to say why it was withheld. The keys
+ * are the same in every language.
+ */
+export interface WithheldSummary {
+  readonly action: Action;
+  readonly surface: string;
+  readonly route: string;
+  readonly degraded: boolean;
+  readonly findings: readonly { category: string; name: string; action: Action; probability: number }[];
+  readonly applied_rules: readonly string[];
+  readonly signals: Readonly<Record<string, number | string>>;
+}
+
 /** How much each action contributes to the session's risk score. */
 export const ACTION_RISK: Readonly<Record<Action, number>> = {
   allow: 0,
@@ -50,6 +78,8 @@ export interface SessionState {
   readonly risk: number;
   readonly floor: Action;
   readonly floor_turns_left: number;
+  /** Beside `turns`: why each withheld turn was withheld, or null. */
+  readonly withheld?: readonly (WithheldSummary | null)[];
 }
 
 /** Per-conversation state. Use one per conversation. */
@@ -61,6 +91,9 @@ export class Session {
   risk = 0;
   readonly verdicts: Verdict[] = [];
   private readonly turns: Turn[] = [];
+  // Runs beside `turns`: why each turn was withheld, or null. `record` sets it; when the two stop
+  // matching, withheld turns are told without a reason.
+  private held: (WithheldSummary | null)[] = [];
   private floorAction: Action = "allow";
   private floorLeft = 0;
 
@@ -72,8 +105,23 @@ export class Session {
   }
 
   addTurn(role: Turn["role"], content: string): void {
+    this.pushTurn(role, content, null);
+  }
+
+  private pushTurn(role: Turn["role"], content: string, held: WithheldSummary | null): void {
+    if (this.held.length !== this.turns.length) this.held = this.turns.map(() => null);
     this.turns.push({ role, content });
-    if (this.turns.length > this.maxTurns) this.turns.splice(0, this.turns.length - this.maxTurns);
+    this.held.push(held);
+    if (this.turns.length > this.maxTurns) {
+      this.turns.splice(0, this.turns.length - this.maxTurns);
+      this.held.splice(0, this.held.length - this.maxTurns);
+    }
+  }
+
+  /** Why turn `index` was withheld, or undefined when unknown. */
+  withheld(index: number): WithheldSummary | undefined {
+    if (this.held.length !== this.turns.length) return undefined;
+    return this.held[index] ?? undefined;
   }
 
   extend(turns: readonly Turn[]): void {
@@ -88,16 +136,35 @@ export class Session {
    * Append a turn given the verdict on it. A turn the guardrail withheld is kept as
    * {@link WITHHELD_PLACEHOLDER}, so the attempt is remembered but its text is never read again.
    */
-  record(role: Turn["role"], content: string, verdict: Pick<Verdict, "deliverable">): void {
-    this.addTurn(role, verdict.deliverable ? content : WITHHELD_PLACEHOLDER);
+  record(role: Turn["role"], content: string, verdict: Pick<Verdict, "deliverable"> & Partial<Verdict>): void {
+    if (verdict.deliverable) this.pushTurn(role, content, null);
+    else this.pushTurn(role, WITHHELD_PLACEHOLDER, summarise(verdict));
   }
 
   /**
-   * The transcript to send to the chat model: withheld turns are left out, so the model never
-   * sees a blocked request, not even as a placeholder it might try to answer.
+   * The transcript for the chat model, with each withheld turn told rather than dropped.
+   *
+   * A withheld user message becomes {@link WITHHELD_NOTE} naming the categories that stopped it,
+   * never its text, followed by {@link DECLINED_REPLY} unless a reply was recorded after it. A
+   * withheld reply becomes {@link WITHHELD_REPLY_NOTE}. Dropping them instead left the model to
+   * meet "do it" or "my first request" with nothing before it, and it guessed.
    */
   modelHistory(): Turn[] {
-    return this.turns.filter((turn) => turn.content !== WITHHELD_PLACEHOLDER);
+    const out: Turn[] = [];
+    this.turns.forEach((turn, i) => {
+      if (turn.content !== WITHHELD_PLACEHOLDER) {
+        out.push({ ...turn });
+        return;
+      }
+      const label = withheldLabel(this.withheld(i));
+      if (turn.role !== "user") {
+        out.push({ role: turn.role, content: WITHHELD_REPLY_NOTE.replace("{label}", label) });
+        return;
+      }
+      out.push({ role: "user", content: WITHHELD_NOTE.replace("{label}", label) });
+      if (this.turns[i + 1]?.role !== "assistant") out.push({ role: "assistant", content: DECLINED_REPLY });
+    });
+    return out;
   }
 
   /**
@@ -186,6 +253,9 @@ export class Session {
       risk: this.risk,
       floor: this.floorAction,
       floor_turns_left: this.floorLeft,
+      withheld: this.turns.map((turn, i) =>
+        turn.content === WITHHELD_PLACEHOLDER ? (this.withheld(i) ?? null) : null,
+      ),
     };
   }
 
@@ -204,6 +274,15 @@ export class Session {
     });
     session.risk = typeof state.risk === "number" ? state.risk : 0;
     session.extend(Array.isArray(state.turns) ? state.turns : []);
+    if (Array.isArray(state.withheld)) {
+      // Aligned from the end, as the window keeps the most recent turns.
+      const held = session.turns.length ? state.withheld.slice(-session.turns.length) : [];
+      if (held.length === session.turns.length) {
+        session.held = held.map((h, i) =>
+          h && typeof h === "object" && session.turns[i]?.content === WITHHELD_PLACEHOLDER ? fromSummary(h) : null,
+        );
+      }
+    }
     const left = typeof state.floor_turns_left === "number" ? state.floor_turns_left : 0;
     const floor = state.floor;
     // A floor that outlived its counter, or a value no longer in the ladder, is no floor.
@@ -229,4 +308,61 @@ export class Session {
     this.floorAction = stronger(this.floorLeft > 0 ? this.floorAction : "allow", floor);
     this.floorLeft = this.carryTurns;
   }
+}
+
+/** The names of the categories that withheld a turn, strongest first, for the model's note. */
+export function withheldLabel(summary: WithheldSummary | undefined): string {
+  if (!summary) return "reason not recorded";
+  const fired = summary.findings.filter((f) => rank(f.action) >= rank("flag"));
+  if (fired.length) {
+    const top = Math.max(...fired.map((f) => rank(f.action)));
+    const names = fired.filter((f) => rank(f.action) === top).map((f) => f.name || f.category);
+    return [...new Set(names)].join(", ");
+  }
+  return summary.degraded ? "the check was unavailable" : "reason not recorded";
+}
+
+function summarise(verdict: Partial<Verdict>): WithheldSummary {
+  const signals: Record<string, number | string> = {};
+  for (const [key, value] of Object.entries(verdict.signals ?? {})) {
+    if (typeof value === "number" || typeof value === "string") signals[key] = value;
+  }
+  return {
+    action: verdict.action ?? "block",
+    surface: verdict.surface ?? "input",
+    route: verdict.route ?? "safe_response",
+    degraded: verdict.degraded ?? false,
+    findings: (verdict.findings ?? []).map((f) => ({
+      category: f.category,
+      name: f.name,
+      action: f.action,
+      probability: Math.round(f.probability * 1e4) / 1e4,
+    })),
+    applied_rules: [...(verdict.appliedRules ?? [])],
+    signals,
+  };
+}
+
+/** Rebuild a stored summary, tolerating a malformed one the way the rest of `fromState` does. */
+function fromSummary(raw: unknown): WithheldSummary | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const findings = Array.isArray(r["findings"]) ? r["findings"] : [];
+  const action = LADDER.includes(r["action"] as Action) ? (r["action"] as Action) : "block";
+  return {
+    action,
+    surface: typeof r["surface"] === "string" ? r["surface"] : "input",
+    route: typeof r["route"] === "string" ? r["route"] : "safe_response",
+    degraded: r["degraded"] === true,
+    findings: findings
+      .filter((f): f is Record<string, unknown> => !!f && typeof f === "object" && typeof (f as Record<string, unknown>)["category"] === "string")
+      .map((f) => ({
+        category: f["category"] as string,
+        name: typeof f["name"] === "string" && f["name"] ? (f["name"] as string) : (f["category"] as string),
+        action: LADDER.includes(f["action"] as Action) ? (f["action"] as Action) : "flag",
+        probability: typeof f["probability"] === "number" ? (f["probability"] as number) : 0,
+      })),
+    applied_rules: Array.isArray(r["applied_rules"]) ? r["applied_rules"].map(String) : [],
+    signals: r["signals"] && typeof r["signals"] === "object" ? (r["signals"] as Record<string, number | string>) : {},
+  };
 }

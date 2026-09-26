@@ -42,18 +42,18 @@ stack cannot drift apart. Neither package has a third-party dependency.
 
 | Release | Tag | What it is | Licence |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.3) | `python/v1.1.3` | The Python and TypeScript package: three checks, multi-turn attribution, realtime review, cache, prefilter, sessions, streaming, offline tuning and the CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.3) | `go/v1.2.3` | The same engine in Go, with the live, replay and regression test tools | CC BY-NC 4.0 |
-| [Python: Viet Nam compliance policy v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.2) | `python-vietnam-compliance-v1.2.2` | The `vietnam-compliance-v1` policy, with prewritten replies in Vietnamese, English and Chinese | CC BY-NC 4.0 |
-| [Go: Viet Nam compliance policy v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.2) | `go-vietnam-compliance-v1.2.2` | The same policy and replies in Go, as module version `v1.3.2` | CC BY-NC 4.0 |
+| [Python SDK 1.1.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.4) | `python/v1.1.4` | The Python and TypeScript package: three checks, multi-turn attribution, realtime review, cache, prefilter, sessions, streaming, offline tuning and the CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.4) | `go/v1.2.4` | The same engine in Go, with the live, replay and regression test tools | CC BY-NC 4.0 |
+| [Python: Viet Nam compliance policy v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.3) | `python-vietnam-compliance-v1.2.3` | The `vietnam-compliance-v1` policy, with prewritten replies in Vietnamese, English and Chinese | CC BY-NC 4.0 |
+| [Go: Viet Nam compliance policy v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.3) | `go-vietnam-compliance-v1.2.3` | The same policy and replies in Go, as module version `v1.3.3` | CC BY-NC 4.0 |
 
 Each release note lists what the release contains and how to install it. In the same order:
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.3#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.3
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.2
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.4#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.4
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.3#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.3
 ```
 
 Python and TypeScript live on `main`; Go on `go-sdk`; the Viet Nam policy on
@@ -289,7 +289,9 @@ Every turn is decided by answering three questions, in order.
    how to report something, or changing the subject, it does not count.
 
 A message that was stopped stays in the conversation as `[earlier message omitted]`: the guardrail
-remembers that an attempt was made, but never reads its text again, and the chat model never sees it.
+remembers that an attempt was made, but never reads its text again. The chat model is told only that a
+message was withheld and which categories stopped it, never its text, so a follow-up such as "do it" or
+"my first request" is answered in context instead of guessed at. The reason is kept in the stored session.
 A conversation counts as *recently risky* for two turns after a serious finding, and for as long as a
 stopped message is still among the last ten messages.
 
@@ -297,9 +299,9 @@ stopped message is still among the last ten messages.
 | --- | --- |
 | 1. The user's message, read alone | [`CheckInput`](go/guard.go#L118) |
 | 2. The reply, read alone | [`CheckOutput`](go/guard.go#L128) |
-| 3. The reply, read with the earlier turns, and whether it counts | [`checkInContext`](go/multiturn.go#L148), [`attribute`](go/multiturn.go#L166) |
-| When a conversation counts as recently risky | [`Session.Watching`](go/multiturn.go#L253) |
-| Stopped messages kept as a placeholder, hidden from the model | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| 3. The reply, read with the earlier turns, and whether it counts | [`checkInContext`](go/multiturn.go#L161), [`attribute`](go/multiturn.go#L179) |
+| When a conversation counts as recently risky | [`Session.Watching`](go/multiturn.go#L281) |
+| Stopped messages kept as a placeholder; the model is told the category, never the text | [`Session.Record`](go/multiturn.go#L238), [`ModelHistory`](go/multiturn.go#L252) |
 | The whole-conversation check: it watches and reports, it never stops a turn | [`CheckConversation`](go/guard.go#L166) |
 | A risky conversation's reply is sent whole, not streamed piece by piece | [`Stream`](go/streaming.go#L74) |
 
@@ -400,7 +402,7 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
+Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L281), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L161) / [`ContextQuestions`](go/multiturn.go#L89), `A_t`, `⊕` [`attribute`](go/multiturn.go#L179), `risk` [`Session.Observe`](go/session.go#L95), `carry` [`Session.Advance`](go/session.go#L112)
 
 ### Single-turn calibration
 
@@ -457,11 +459,11 @@ about the law.
 | Dataset | Size | Content | Labels |
 | --- | --- | --- | --- |
 | [`examples/multiturn-live.jsonl`](examples/multiturn-live.jsonl) | 223 conversations | single, repeated and interleaved violations; histories beyond the window; escalations | expected outcome per case; violations referenced by id from the labelled sets |
-| [`examples/multiturn-contamination.jsonl`](examples/multiturn-contamination.jsonl) | 26 scenarios, [`TestMultiturnScenarios`](go/multiturn_test.go#L165) | simulated Jev answers | expected outcome per case |
+| [`examples/multiturn-contamination.jsonl`](examples/multiturn-contamination.jsonl) | 26 scenarios, [`TestMultiturnScenarios`](go/multiturn_test.go#L166) | simulated Jev answers | expected outcome per case |
 | [`cases-input.jsonl`](examples/cases-input.jsonl), [`cases-output.jsonl`](examples/cases-output.jsonl) | 51 cases | single-turn | expected action |
 
 Protocols: **live** [`TestLiveMultiturn`](go/live_multiturn_test.go#L96) (Jev, both designs, every raw answer recorded); **replay** [`TestReplayVariants`](go/replay_test.go#L224), [`TestReplayConversation`](go/replay_test.go#L300), [`TestReplayRealtime`](go/replay_test.go#L424) (about 5,000 recorded
-answers decided again under each variant, so variants are compared on identical data); **noise** [`TestMultiturnAttributionUnderNoise`](go/multiturn_test.go#L233)
+answers decided again under each variant, so variants are compared on identical data); **noise** [`TestMultiturnAttributionUnderNoise`](go/multiturn_test.go#L234)
 (simulated answers jittered, σ ∈ {0.05, 0.1, 0.2}); **regression** [`TestLiveSingleTurnRegression`](go/live_multiturn_test.go#L338) (single-turn sets, before and
 after). Metrics: harmless hold rate (FPR), violation catch rate (recall), review-queue rate.
 
