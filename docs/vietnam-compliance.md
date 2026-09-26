@@ -49,19 +49,24 @@ unchanged from `standard-v1`.
 Python:
 
 ```python
-from guardrail_chatbot_jev import Guard, Responder, detect_language
+from guardrail_chatbot_jev import Guard, Responder, Session, detect_language
 
 guard = Guard("vietnam-compliance-v1")
 responder = Responder(guard.policy)          # default support line: 115
 
-def handle(message: str) -> str:
+def handle(session: Session, message: str) -> str:   # one session per conversation
     lang = detect_language(message)          # "vi", "en" or "zh"
-    verdict_in = guard.check_input(message)
+    verdict_in = guard.check_input(message, session=session)
+    session.record("user", message, verdict_in)
     if held := responder.blocking_response([verdict_in], language=lang):
+        session.advance()
         return held
-    reply = call_model(message)
-    verdict_out = guard.check_output(reply, user_message=message)
-    return responder.compose(reply, [verdict_in, verdict_out], language=lang)
+    reply = call_model(responder.model_history(session, lang))   # withheld turns become a note naming the group
+    verdict_out = guard.check_output(reply, user_message=message, session=session)
+    sent = responder.compose(reply, [verdict_in, verdict_out], language=lang)
+    session.record("assistant", sent, verdict_out)
+    session.advance()
+    return sent
 ```
 
 Go (ships in release `go-vietnam-compliance-v1`, module `v1.1.0` and later):
@@ -105,7 +110,7 @@ return sent
    groups under Vietnamese law. The crisis reply is used only when self-harm **leads**. A request to
    build something that destroys a building gets the violence reply; if the self-harm signal is
    still over its block band, the reply adds one line pointing to **115**.
-8. After a withheld turn, send the model `responder.ModelHistory(session, lang)` rather than the raw
+8. After a withheld turn, send the model `responder.model_history(session, lang)` (Go: `responder.ModelHistory`) rather than the raw
    history. A withheld turn becomes a note naming its group (never its text) followed by the reply
    the user was shown. When the user then says "do it" or "my first request", the model knows what
    it declined instead of guessing or saying it cannot see the message.

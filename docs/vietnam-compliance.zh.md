@@ -43,19 +43,24 @@
 Python：
 
 ```python
-from guardrail_chatbot_jev import Guard, Responder, detect_language
+from guardrail_chatbot_jev import Guard, Responder, Session, detect_language
 
 guard = Guard("vietnam-compliance-v1")
 responder = Responder(guard.policy)          # 默认求助热线：115
 
-def handle(message: str) -> str:
+def handle(session: Session, message: str) -> str:   # 每段对话一个 session
     lang = detect_language(message)          # "vi"、"en" 或 "zh"
-    verdict_in = guard.check_input(message)
+    verdict_in = guard.check_input(message, session=session)
+    session.record("user", message, verdict_in)
     if held := responder.blocking_response([verdict_in], language=lang):
+        session.advance()
         return held
-    reply = call_model(message)
-    verdict_out = guard.check_output(reply, user_message=message)
-    return responder.compose(reply, [verdict_in, verdict_out], language=lang)
+    reply = call_model(responder.model_history(session, lang))   # 被扣留的轮次替换为注明类别的说明
+    verdict_out = guard.check_output(reply, user_message=message, session=session)
+    sent = responder.compose(reply, [verdict_in, verdict_out], language=lang)
+    session.record("assistant", sent, verdict_out)
+    session.advance()
+    return sent
 ```
 
 Go（包含在发布版本 `go-vietnam-compliance-v1` 中，模块版本 `v1.1.0` 及以上）：
@@ -90,7 +95,7 @@ return sent
 5. 等待人工审核的内容会收到中性提示，不认定用户违规。
 6. 当内容审核系统中断时，告知用户系统中断，而不是指责用户。
 7. 回复说明真正导致内容被拦截的原因：暴力与武器、伤害儿童、违法犯罪、色情内容、仇恨、绕过安全设置、著作权，以及越南法律规定的各组。只有当自我伤害是**首要**风险时才使用危机回复。请求制造能摧毁建筑物的东西，会得到关于暴力的回复；如果自我伤害信号仍超过其拦截阈值，回复末尾会加上一行拨打 **115** 的提示。
-8. 某轮被扣留后，向模型发送 `responder.ModelHistory(session, lang)`，而不是原始历史。被扣留的轮次替换为注明违规类别的说明（绝不包含原文），以及用户实际收到的回复。这样当用户说“照做吧”或“我的第一个请求”时，模型知道自己拒绝了什么，而不会去猜测或说看不到那条消息。
+8. 某轮被扣留后，向模型发送 `responder.model_history(session, lang)`（Go：`responder.ModelHistory`），而不是原始历史。被扣留的轮次替换为注明违规类别的说明（绝不包含原文），以及用户实际收到的回复。这样当用户说“照做吧”或“我的第一个请求”时，模型知道自己拒绝了什么，而不会去猜测或说看不到那条消息。
 
 ## 第六步：不误拦正常提问
 

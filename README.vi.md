@@ -42,17 +42,17 @@ thứ ba nào.
 
 | Bản phát hành | Tag | Nội dung | Giấy phép |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.2) | `python/v1.1.2` | Gói Python và TypeScript: ba lượt kiểm tra, quy lỗi multi-turn, review realtime, cache, prefilter, session, streaming, hiệu chỉnh offline và CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.2) | `go/v1.2.2` | Cùng engine bằng Go, kèm công cụ test chạy thật, chấm lại và hồi quy | CC BY-NC 4.0 |
-| [Python: policy tuân thủ Việt Nam v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.1) | `python-vietnam-compliance-v1.2.1` | Policy `vietnam-compliance-v1`, kèm câu trả lời viết sẵn bằng tiếng Việt, tiếng Anh và tiếng Trung | CC BY-NC 4.0 |
+| [Python SDK 1.1.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.3) | `python/v1.1.3` | Gói Python và TypeScript: ba lượt kiểm tra, quy lỗi multi-turn, review realtime, cache, prefilter, session, streaming, hiệu chỉnh offline và CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.3) | `go/v1.2.3` | Cùng engine bằng Go, kèm công cụ test chạy thật, chấm lại và hồi quy | CC BY-NC 4.0 |
+| [Python: policy tuân thủ Việt Nam v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.2) | `python-vietnam-compliance-v1.2.2` | Policy `vietnam-compliance-v1`, kèm câu trả lời viết sẵn bằng tiếng Việt, tiếng Anh và tiếng Trung | CC BY-NC 4.0 |
 | [Go: policy tuân thủ Việt Nam v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.2) | `go-vietnam-compliance-v1.2.2` | Cùng policy và câu trả lời đó cho Go, phiên bản module `v1.3.2` | CC BY-NC 4.0 |
 
 Release note của từng bản ghi rõ nội dung và cách cài đặt. Theo đúng thứ tự trên:
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.2
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.1#subdirectory=python"
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.3#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.3
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.2#subdirectory=python"
 go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.2
 ```
 

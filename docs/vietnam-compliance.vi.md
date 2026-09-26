@@ -50,19 +50,24 @@ Các nhóm an toàn chung (bạo lực, vũ khí, xâm hại trẻ em, tự hạ
 Python:
 
 ```python
-from guardrail_chatbot_jev import Guard, Responder, detect_language
+from guardrail_chatbot_jev import Guard, Responder, Session, detect_language
 
 guard = Guard("vietnam-compliance-v1")
 responder = Responder(guard.policy)          # đường dây hỗ trợ mặc định: 115
 
-def handle(message: str) -> str:
+def handle(session: Session, message: str) -> str:   # một session cho mỗi cuộc hội thoại
     lang = detect_language(message)          # "vi", "en" hoặc "zh"
-    verdict_in = guard.check_input(message)
+    verdict_in = guard.check_input(message, session=session)
+    session.record("user", message, verdict_in)
     if held := responder.blocking_response([verdict_in], language=lang):
+        session.advance()
         return held
-    reply = call_model(message)
-    verdict_out = guard.check_output(reply, user_message=message)
-    return responder.compose(reply, [verdict_in, verdict_out], language=lang)
+    reply = call_model(responder.model_history(session, lang))   # lượt bị chặn được thay bằng ghi chú nêu nhóm
+    verdict_out = guard.check_output(reply, user_message=message, session=session)
+    sent = responder.compose(reply, [verdict_in, verdict_out], language=lang)
+    session.record("assistant", sent, verdict_out)
+    session.advance()
+    return sent
 ```
 
 Go (có trong bản phát hành `go-vietnam-compliance-v1`, module `v1.1.0` trở lên):
@@ -106,7 +111,7 @@ return sent
    luật Việt Nam. Câu trả lời khủng hoảng chỉ dùng khi tự hại là mối lo **dẫn đầu**. Một yêu cầu chế
    tạo thứ phá hủy tòa nhà nhận câu trả lời về bạo lực; nếu tín hiệu tự hại vẫn vượt ngưỡng chặn, câu
    trả lời có thêm một dòng hướng dẫn gọi **115**.
-8. Sau một lượt bị chặn, gửi cho mô hình `responder.ModelHistory(session, lang)` thay vì lịch sử
+8. Sau một lượt bị chặn, gửi cho mô hình `responder.model_history(session, lang)` (Go: `responder.ModelHistory`) thay vì lịch sử
    thô. Lượt bị chặn được thay bằng một ghi chú nêu nhóm vi phạm (không bao giờ chứa nội dung gốc) và
    câu trả lời người dùng đã nhận. Nhờ vậy, khi người dùng nói "làm đi" hay "yêu cầu đầu tiên của
    tôi", mô hình biết mình đã từ chối điều gì, thay vì đoán hoặc nói không thấy tin nhắn.
