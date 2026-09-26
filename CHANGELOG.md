@@ -3,6 +3,26 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Go multi-turn v1] - 2026-09-26
+
+### Changed
+
+- Multi-turn: a turn is held only for what it or its reply does. The input check never reads the
+  history; in a watched session the reply is also read in context, and those findings count only
+  when the reply completes an earlier harmful request. `MultiturnFloor` keeps the earlier floor.
+- Withheld turns are kept as `[earlier message omitted]` and left out of `Session.ModelHistory()`;
+  the session's risk is no longer sent to Jev; a transcript of withheld turns alone is not checked.
+- `standard-v1`: sentinel corroboration, a confidence gate that respects benign intent, a cap for
+  conversations that are not escalating, specialised advice judged per reply, and `ncr` / `iwp`
+  descriptions that exclude victims and questions about the law.
+
+### Added
+
+- `ReviewHandling: ReviewAsAudit` for realtime chat, and an `audit` level on every verdict.
+- `examples/multiturn-live.jsonl` (223 conversations) and `examples/multiturn-contamination.jsonl`
+  (26 simulated scenarios); live, replay and regression tests in `go/` behind the `live` and
+  `replay` build tags.
+
 ## [Go 1.0.1] - 2026-09-23
 
 ### Added

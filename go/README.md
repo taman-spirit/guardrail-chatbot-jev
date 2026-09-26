@@ -51,6 +51,31 @@ Three differences worth knowing:
 - Policy packs are JSON only. Convert a YAML pack before loading it.
 - An empty `UserMessage` is left out of the output state, where Python leaves out only `None`.
 
+## Multi-turn and realtime chat
+
+A turn is held only for what it, or the reply to it, does; the history is used to understand a
+turn, never to convict it. In a watched session the reply is also read against the earlier turns,
+and those findings count only when the reply itself completes an earlier harmful request. With
+`ReviewHandling: ReviewAsAudit`, meant for realtime chat, only `block` stops content and `review`
+delivers it and queues it for audit.
+
+```go
+guard := guardrail.New(guardrail.Options{ReviewHandling: guardrail.ReviewAsAudit})
+session := guardrail.NewSession(conversationID)
+
+in, _ := guard.CheckInput(ctx, message, &guardrail.CheckOptions{Session: session})
+session.Record("user", message, in)
+reply := callModel(session.ModelHistory(), message)
+out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{Session: session, UserMessage: message})
+session.Record("assistant", reply, out)
+session.Advance()
+```
+
+Measured live on 223 conversations: 0 of 194 harmless follow-ups held (the earlier floor held
+171), every harmful reply and escalation still caught. The method, the formulas and all results are
+in the [Multi-turn section of the main README](../README.md#multi-turn). `MultiturnFloor` keeps the
+earlier behaviour.
+
 ## Streaming
 
 ```go
@@ -84,7 +109,9 @@ Python exits `2` or `1`, so that a verdict code only ever means a verdict.
 ## Tests
 
 ```bash
-cd go && go test -race ./...
+cd go && go test -race ./...                                    # no key, no network
+JEV_API_KEY=... go test -tags live -run TestLiveMultiturn -v ./  # 223 conversations against Jev
+REPLAY_DIRS='/tmp/mt*' go test -tags replay -run TestReplay -v ./ # offline, from recorded answers
 ```
 
 No API key and no network: the suite decides against recorded answers.

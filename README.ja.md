@@ -247,58 +247,66 @@ finding）。
 
 ## マルチターン
 
-マルチターンの攻撃は、1 ターンずつ見ればどれも弁解の立つターンで組み立てられています。各ターンを
-ゼロから判断することがそれを成立させているので、ガードレールは単発の検査にはできないことを 2 つ
-行います。
+マルチターン攻撃は、一つずつ見れば無害に見えるメッセージの積み重ねなので、会話全体を読む必要があります。
+しかし素朴に読むと逆の失敗が起きます。分類器が履歴の違反を見て、次のメッセージ（謝罪、法律の質問、天気の質問）
+にも同じラベルを付けてしまう。これが**文脈汚染**です。以前の設計は違反の後のターンをすべて保留しており、
+Jev で実測すると**無害な後続 194 件中 171 件**を保留していました。
 
-**`check_conversation` は会話全体を読みます。** これが三つめのサーフェスで、会話の形からしか見えない
-ものを探します。無害に始めてアシスタント自身の以前の回答を足がかりにするクレッシェンド、ターンを
-またいだエスカレーション、自分の規則から少しずつ引き離されたペルソナです。
+**原則：履歴は現在のターンを理解するためのものであり、裁くためのものではない。** ターンが保留されるのは、
+そのターン自身、またはそれへの応答が有害な場合だけです。
 
-**`Session` が起きたことを持ち越します。** 会話履歴、減衰するリスクスコア、そして次の数ターンに
-かかるフロアを保持します。
+1. **入力は単独で読みます。** 履歴もセッションのリスク値も Jev には送りません。
+2. **応答は単独で読み、監視中のセッションでは文脈付きでも並列に読みます。**
+3. **文脈付きの読みは、応答自体が以前の有害な依頼を完成させる場合にだけ反映します**
+   （次の手順、詳細、言い換え、翻訳、フィクションとしての再話）。
+4. **保留したターンは `[earlier message omitted]` として履歴に残します。** 試みは記憶されますが、本文は二度と
+   読まれず、モデルにも見せません。
+5. **会話チェックは監視のみで、ターンを保留しません。** 有害な目的に向かっていない会話は `flag` までに抑えます。
+6. **監視中のセッションでは応答を分割配信せず**、文脈付きの最終チェックの後に送ります。
 
-```python
-from guardrail_chatbot_jev import Guard, Session
+```
+Input verdict        V_in(t)  = D(input,  J(q_t))                        history never included
+Output verdict       V_out(t) = D(output, J(r_t))
 
-guard = Guard()
-session = Session(id=conversation_id)     # 会話ごとに 1 つ、ターンをまたいで保持する
+Watch                W_t = carry_left > 0  ∨  risk_t ≥ 0.2  ∨  (placeholder ∈ H_t)
+In-context read      if W_t:  V_ctx = D(output, J(r_t | H_t)),  c = P(completes),  d = P(disengages)
+Attribution          A_t = c ≥ τ  ∧  c ≥ d  ∧  V_ctx has a finding ≥ flag           τ = 0.5
+Final                V(t) = V_out(t) ⊕ V_ctx   if A_t
+                     V(t) = V_out(t)           otherwise (V_ctx kept on record only)
 
-verdict = guard.check_input(user_message, session=session)
-...
-session.add_turn("user", user_message)
-session.add_turn("assistant", reply)
-session.advance()                          # 上がったフロアを期限切れにする
-
-guard.check_conversation(session.history, session=session)
+Risk                 risk_{t+1} = max(δ · risk_t, ρ(action)),  δ = 0.5
+                     ρ(allow, flag, review, block) = (0, 0.25, 0.6, 1.0)
+Carry                carry_left = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-判定を実際に変えるのはフロアです。
+```
+Uncorroborated       u_k = (finding came from the sentinel alone) ∧ choice_k < 0.02
+never_below          applies only if ¬u_k ∨ p ≥ θ_block
+Weak sentinel        u_k ∧ p < θ_block                            → at most flag (recorded, delivered)
+Declining reply      output ∧ refusal ≥ 0.8 ∧ u_k ∧ p < 0.5 ∧ k ∉ {sid, prv, ipv}   → flag
+Masked, not blocked  u_k ∧ route_k = redact ∧ action = block ∧ p < 0.8               → review (redact)
+Confidence gate      escalate to review if conf < 0.65 ∧ (finding ∨ p ≥ θ_flag/2)
+                     unless intent = benign ∧ conf ≥ 0.5
+Conversation cap     escalation ≤ 0.5  → cap at flag, except cse and ssh
+```
 
-| 何が発火したか | 設定されるフロア | 継続 |
+**リアルタイムチャット：** `ReviewHandling: ReviewAsAudit` では `block` だけが内容を止めます。`review` は内容を
+届けたうえで優先監査キューへ、`flag` はサンプリング監査へ回します。fail-closed の面での degraded 判定は保留のままです。
+
+| 実測、223 会話 | 以前の設計 | 現在 |
 | --- | --- | --- |
-| **会話**の判定が `review` 以上 | `review` | 2 ターン（`carry_turns`） |
-| 単発メッセージが `block` になった | `flag` | 2 ターン |
+| 保留された無害なターン | 171 / 194 | **0 / 194** |
+| 検出した有害な応答 | 19 / 19 | **19 / 19** |
+| 検出したエスカレーション | 9 / 9 | **9 / 9** |
+| レビューに回った無害な会話 | 172 / 194 | **2 / 194** |
 
-フロアが立っているあいだ、後続の判定はそれより下に落ちず、ルートも合わせて再計算されるので、
-引き上げられた判定が `deliver` で終わることはありません。並行して `risk` は毎ターン半減し
-（`allow` 0、`flag` 0.25、`review` 0.6、`block` 1.0）、1 回フラグが立ったターンも、きれいなターンが
-3〜4 回続けば効かなくなります。`session.metadata()` は会話 ID、ターン番号、現在のリスクを以降の
-ターンで Jev に渡します。
+| 記録した約 5,000 件の回答によるオフライン再判定 | 無害の保留 | 違反の検出 |
+| --- | --- | --- |
+| センチネル裏付けの導入後 | 0.62 % | 100 % |
+| ＋弱いセンチネルは flag まで、信頼度ゲートは意図を考慮 | **0.04 %** | **100 %** |
+| リアルタイム（`ReviewAsAudit`） | **0.02 %** 停止（1 / 4,189） | 有害な応答はすべて停止 |
 
-知っておく価値のある 3 点:
-
-- **degraded な判定はセッションを決して動かしません。** Jev に到達できないのは障害であって会話に
-  ついての証拠ではなく、それを数えると短い障害が無実のユーザーへの長い疑いに変わります。
-- **会話検査のフロアは、それを引き起こしたターンではなく次のターンに効きます。** これは手抜きでは
-  なく本質です。パターンはそれを完成させるターンが存在して初めて見えるからです。クリティカルパスの
-  外で走らせれば、ユーザーの待ち時間は増えません。
-- **履歴ウィンドウは 10 ターン**（`max_turns`）です。エスカレーションは直近のターンに宿るので、短い
-  ウィンドウでも同じように見つかり、入力トークンはごく一部で済みます。会話が本当に 10 ターンを超えて
-  積み上がるなら増やしてください。
-
-セッションはリクエストより長く生きて初めて意味を持ちます。これはガードレールではなくデプロイの問題
-なので、ワーカーをまたいで保存する方法は[本番に出すために](#本番に出すために)を見てください。
+手法の詳細、段階ごとの実測、ノイズ耐性、回帰テスト、再現コマンドは[英語版](README.md#multi-turn)を参照してください。
 
 ---
 
@@ -434,8 +442,8 @@ guard = Guard(cache=LRUCache(), observer=metrics.emit, timeout=2.0)
 ```
 
 **セッションはリクエストより長く生きなければなりません。** ここがサーバーの静かに間違える場所です。
-複数ワーカーでプロセスごとに状態を持つと、どのワーカーもすべての会話が今始まったと思い込み、フロアの
-持ち越しがログに何も残さず止まります。`Session.as_state()` と `Session.from_state()` がストアの保存
+複数ワーカーでプロセスごとに状態を持つと、どのワーカーもすべての会話が今始まったと思い込み、監視状態と
+保留ターンの持ち越しがログに何も残さず止まります。`Session.as_state()` と `Session.from_state()` がストアの保存
 するもので、[`examples/session_store.py`](examples/session_store.py) にワーカー 1 つ向けの上限付き
 インメモリ版と、それ以上のための Redis 版があります。
 
