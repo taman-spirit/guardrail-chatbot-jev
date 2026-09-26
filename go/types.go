@@ -150,6 +150,8 @@ type Verdict struct {
 	Partial bool
 	// Prefilter names the rule when a prefilter decided without calling Jev.
 	Prefilter string
+	// Context is what the in-context output check found, when it ran.
+	Context *ContextRead
 }
 
 // Allowed is true when the content may be delivered as-is or with a flag only.
@@ -230,6 +232,7 @@ func (v Verdict) MarshalJSON() ([]byte, error) {
 		"partial":       v.Partial,
 		"prefilter":     nullable(v.Prefilter),
 		"error":         nullable(v.Error),
+		"context":       v.Context,
 	})
 }
 

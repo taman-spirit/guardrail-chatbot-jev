@@ -2,6 +2,7 @@ package guardrail
 
 import (
 	"context"
+	"math"
 	"unicode"
 )
 
@@ -60,6 +61,18 @@ func (g *Guard) Stream(ctx context.Context, source <-chan string, opts StreamOpt
 	chunkChars := opts.ChunkChars
 	if chunkChars <= 0 {
 		chunkChars = 280
+	}
+	// Mid-stream checks read each chunk on its own. In a watched session a part that is harmful
+	// only in the light of earlier turns would get past them, so the reply is held whole for the
+	// final check, which reads it in context.
+	if g.opts.Multiturn == MultiturnAttribute && !g.opts.ContextCheck.Never && opts.Session != nil {
+		threshold := g.opts.ContextCheck.WatchRisk
+		if threshold <= 0 {
+			threshold = defaultWatchRisk
+		}
+		if g.opts.ContextCheck.Always || opts.Session.Watching(threshold) {
+			chunkChars = math.MaxInt32
+		}
 	}
 	out := make(chan StreamEvent)
 
