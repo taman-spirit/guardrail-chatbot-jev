@@ -297,8 +297,8 @@ mémorisée, son texte n'est jamais relu, et le modèle ne le voit pas.
 | 1. Le message de l'utilisateur, lu seul | [`CheckInput`](go/guard.go#L118) |
 | 2. La réponse, lue seule | [`CheckOutput`](go/guard.go#L128) |
 | 3. La réponse, lue avec les tours précédents, et si elle compte | [`checkInContext`](go/multiturn.go#L148), [`attribute`](go/multiturn.go#L166) |
-| Quand une conversation est considérée comme récemment risquée | [`Session.Watching`](go/multiturn.go#L253) |
-| Messages arrêtés conservés comme repère, cachés au modèle | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| Quand une conversation est considérée comme récemment risquée | [`Session.Watching`](go/multiturn.go#L255) |
+| Messages arrêtés conservés comme repère, cachés au modèle | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L236) |
 | Vérification de la conversation entière : elle surveille, n'arrête jamais un tour | [`CheckConversation`](go/guard.go#L166) |
 
 ### Exemple, tour par tour
@@ -389,7 +389,7 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-Code : `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
+Code : `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L255), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L95), `carry` [`Session.Advance`](go/session.go#L112)
 
 ### Calibrage mono-tour
 

@@ -64,15 +64,21 @@ Go（包含在发布版本 `go-vietnam-compliance-v1` 中，模块版本 `v1.1.0
 policy, _ := guardrail.BundledPolicy("vietnam-compliance-v1")
 guard := guardrail.New(guardrail.Options{Policy: policy})
 responder, _ := guardrail.NewResponder(policy, "") // "" = 115
+session := guardrail.NewSession(conversationID) // 每段对话一个 session
 
 lang := guardrail.DetectLanguage(message)
-in, _ := guard.CheckInput(ctx, message, nil)
+in, _ := guard.CheckInput(ctx, message, &guardrail.CheckOptions{Session: session})
+session.Record("user", message, in)
 if held, ok := responder.BlockingResponse([]guardrail.Verdict{in}, lang); ok {
+	session.Advance()
 	return held
 }
-reply := callModel(message)
-out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{UserMessage: message})
-return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
+reply := callModel(responder.ModelHistory(session, lang)) // 被扣留的轮次替换为注明类别的说明
+out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{Session: session, UserMessage: message})
+sent := responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
+session.Record("assistant", sent, out)
+session.Advance()
+return sent
 ```
 
 ## 第五步：使用预设回复，不让模型自行撰写
@@ -83,6 +89,8 @@ return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
 4. 当用户出现自我伤害迹象时，回复以共情为主，不提及法律，并引导拨打 **115**。如贵机构有经过核实的心理援助热线，请通过 `Responder(policy, crisis_line="...")` 传入。
 5. 等待人工审核的内容会收到中性提示，不认定用户违规。
 6. 当内容审核系统中断时，告知用户系统中断，而不是指责用户。
+7. 回复说明真正导致内容被拦截的原因：暴力与武器、伤害儿童、违法犯罪、色情内容、仇恨、绕过安全设置、著作权，以及越南法律规定的各组。只有当自我伤害是**首要**风险时才使用危机回复。请求制造能摧毁建筑物的东西，会得到关于暴力的回复；如果自我伤害信号仍超过其拦截阈值，回复末尾会加上一行拨打 **115** 的提示。
+8. 某轮被扣留后，向模型发送 `responder.ModelHistory(session, lang)`，而不是原始历史。被扣留的轮次替换为注明违规类别的说明（绝不包含原文），以及用户实际收到的回复。这样当用户说“照做吧”或“我的第一个请求”时，模型知道自己拒绝了什么，而不会去猜测或说看不到那条消息。
 
 ## 第六步：不误拦正常提问
 

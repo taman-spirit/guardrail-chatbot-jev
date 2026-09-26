@@ -32,6 +32,10 @@ type Session struct {
 
 	floor     Action
 	floorLeft int
+	// held runs beside Turns: the verdict that withheld each turn, or nil. Record sets it and
+	// Responder.ModelHistory reads it; when Turns is edited directly the two stop matching and
+	// withheld turns are then told without their group.
+	held []*Verdict
 }
 
 // NewSession starts a session with the default decay 0.5, carry of 2 turns and window of 10.
@@ -41,10 +45,27 @@ func NewSession(id string) *Session {
 
 // AddTurn appends a message, keeping only the most recent MaxTurns.
 func (s *Session) AddTurn(role, content string) {
+	s.addTurn(role, content, nil)
+}
+
+func (s *Session) addTurn(role, content string, held *Verdict) {
+	if len(s.held) != len(s.Turns) {
+		s.held = make([]*Verdict, len(s.Turns))
+	}
 	s.Turns = append(s.Turns, Turn{Role: role, Content: content})
+	s.held = append(s.held, held)
 	if s.MaxTurns > 0 && len(s.Turns) > s.MaxTurns {
 		s.Turns = append([]Turn(nil), s.Turns[len(s.Turns)-s.MaxTurns:]...)
+		s.held = append([]*Verdict(nil), s.held[len(s.held)-s.MaxTurns:]...)
 	}
+}
+
+// heldVerdict is the verdict that withheld turn i, or nil when unknown.
+func (s *Session) heldVerdict(i int) *Verdict {
+	if len(s.held) != len(s.Turns) || i < 0 || i >= len(s.held) {
+		return nil
+	}
+	return s.held[i]
 }
 
 // Extend appends several turns.

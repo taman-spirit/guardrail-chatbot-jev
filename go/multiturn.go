@@ -223,10 +223,12 @@ func (g *Guard) attribute(v Verdict, res contextResult) Verdict {
 // Record appends a turn given the verdict on it. A turn the guardrail withheld is kept as
 // WithheldPlaceholder, so the attempt is remembered but its text is never read again.
 func (s *Session) Record(role, content string, v Verdict) {
-	if !v.Deliverable() {
-		content = WithheldPlaceholder
+	if v.Deliverable() {
+		s.AddTurn(role, content)
+		return
 	}
-	s.AddTurn(role, content)
+	held := v
+	s.addTurn(role, WithheldPlaceholder, &held)
 }
 
 // ModelHistory is the transcript to send to the chat model: withheld turns are left out, so the

@@ -277,8 +277,8 @@ finding）。
 | 1. ユーザーのメッセージを単独で読む | [`CheckInput`](go/guard.go#L118) |
 | 2. 応答を単独で読む | [`CheckOutput`](go/guard.go#L128) |
 | 3. 応答を以前のターンと一緒に読み、効くかを判断する | [`checkInContext`](go/multiturn.go#L148), [`attribute`](go/multiturn.go#L166) |
-| 会話が「最近リスクあり」とみなされる条件 | [`Session.Watching`](go/multiturn.go#L253) |
-| 止めたメッセージを印として残し、モデルから隠す | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| 会話が「最近リスクあり」とみなされる条件 | [`Session.Watching`](go/multiturn.go#L255) |
+| 止めたメッセージを印として残し、モデルから隠す | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L236) |
 | 会話全体のチェック：監視と報告のみで、ターンは止めない | [`CheckConversation`](go/guard.go#L166) |
 
 ### ターンごとの例
@@ -369,7 +369,7 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-コード：`V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
+コード：`V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L255), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L95), `carry` [`Session.Advance`](go/session.go#L112)
 
 ### 単一ターンの較正
 

@@ -293,8 +293,8 @@ tin nhắn bị chặn còn nằm trong mười tin nhắn gần nhất.
 | 1. Tin nhắn người dùng, đọc riêng | [`CheckInput`](go/guard.go#L118) |
 | 2. Câu trả lời, đọc riêng | [`CheckOutput`](go/guard.go#L128) |
 | 3. Câu trả lời, đọc cùng các lượt trước, và có được tính không | [`checkInContext`](go/multiturn.go#L148), [`attribute`](go/multiturn.go#L166) |
-| Khi nào hội thoại được xem là vừa có dấu hiệu rủi ro | [`Session.Watching`](go/multiturn.go#L253) |
-| Tin nhắn bị chặn giữ lại dạng placeholder, ẩn khỏi mô hình | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| Khi nào hội thoại được xem là vừa có dấu hiệu rủi ro | [`Session.Watching`](go/multiturn.go#L255) |
+| Tin nhắn bị chặn giữ lại dạng placeholder, ẩn khỏi mô hình | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L236) |
 | Kiểm tra cả hội thoại: chỉ theo dõi và báo cáo, không bao giờ chặn một lượt | [`CheckConversation`](go/guard.go#L166) |
 | Hội thoại có rủi ro thì câu trả lời được gửi trọn vẹn, không stream từng phần | [`Stream`](go/streaming.go#L74) |
 
@@ -406,7 +406,7 @@ risk_t+1  = max(δ · risk_t, ρ(hành động)),  δ = 0.5,  ρ = (0, 0.25, 0.6
 carry     = 2 lượt sau một verdict hội thoại ≥ review hoặc bất kỳ block nào
 ```
 
-Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
+Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L255), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L95), `carry` [`Session.Advance`](go/session.go#L112)
 
 ### Hiệu chỉnh đơn lượt
 

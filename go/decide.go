@@ -486,13 +486,22 @@ func route(p *Policy, findings []Finding, action Action) Route {
 		// Only a finding that still counts sets the handling. One a rule capped to allow is a
 		// record, and a sentinel the hazard choice does not back, still at flag, must not replace an
 		// ordinary answer with a crisis message.
-		if Rank(f.Action) < Rank(Flag) || (f.Uncorroborated && f.Action == Flag) {
+		if !routeCounts(f) {
 			continue
 		}
-		if cat, ok := p.Categories[f.Category]; ok && categoryRoutes[cat.Route] {
-			hazardRoute = cat.Route
-			break
+		cat, ok := p.Categories[f.Category]
+		if !ok || !categoryRoutes[cat.Route] {
+			continue
 		}
+		// The crisis route answers only when self-harm leads. The self-harm sentinel answers 0.15
+		// to 0.66 on a request to build a bomb or bring down a building, which is about harming
+		// others; a crisis message in reply answers the wrong question. The finding keeps its
+		// action, so the content is still held, and the responder adds the crisis line.
+		if cat.Route == RouteCrisisSupport && !leads(f, findings) {
+			continue
+		}
+		hazardRoute = cat.Route
+		break
 	}
 	if hazardRoute == RouteCrisisSupport && action != Allow {
 		return RouteCrisisSupport
@@ -510,6 +519,25 @@ func route(p *Policy, findings []Finding, action Action) Route {
 		return RouteHumanReview
 	}
 	return RouteDeliver
+}
+
+// routeCounts reports whether a finding can set the handling.
+func routeCounts(f Finding) bool {
+	return Rank(f.Action) >= Rank(Flag) && !(f.Uncorroborated && f.Action == Flag)
+}
+
+// leads reports whether no other finding that counts is ahead of f: none at a stronger action, and
+// none at the same action with a higher probability. A tie goes to f.
+func leads(f Finding, findings []Finding) bool {
+	for _, g := range findings {
+		if g.Category == f.Category || !routeCounts(g) {
+			continue
+		}
+		if Rank(g.Action) > Rank(f.Action) || (g.Action == f.Action && g.Probability > f.Probability) {
+			return false
+		}
+	}
+	return true
 }
 
 func severity(signals map[string]any, findings []Finding) float64 {

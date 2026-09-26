@@ -301,8 +301,8 @@ stopped message is still among the last ten messages.
 | 1. The user's message, read alone | [`CheckInput`](go/guard.go#L118) |
 | 2. The reply, read alone | [`CheckOutput`](go/guard.go#L128) |
 | 3. The reply, read with the earlier turns, and whether it counts | [`checkInContext`](go/multiturn.go#L148), [`attribute`](go/multiturn.go#L166) |
-| When a conversation counts as recently risky | [`Session.Watching`](go/multiturn.go#L253) |
-| Stopped messages kept as a placeholder, hidden from the model | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| When a conversation counts as recently risky | [`Session.Watching`](go/multiturn.go#L255) |
+| Stopped messages kept as a placeholder, hidden from the model | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L236) |
 | The whole-conversation check: it watches and reports, it never stops a turn | [`CheckConversation`](go/guard.go#L166) |
 | A risky conversation's reply is sent whole, not streamed piece by piece | [`Stream`](go/streaming.go#L74) |
 
@@ -413,7 +413,7 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
+Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L255), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L95), `carry` [`Session.Advance`](go/session.go#L112)
 
 ### Single-turn calibration
 

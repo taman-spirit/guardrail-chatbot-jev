@@ -71,15 +71,21 @@ Go (có trong bản phát hành `go-vietnam-compliance-v1`, module `v1.1.0` tr�
 policy, _ := guardrail.BundledPolicy("vietnam-compliance-v1")
 guard := guardrail.New(guardrail.Options{Policy: policy})
 responder, _ := guardrail.NewResponder(policy, "") // "" = 115
+session := guardrail.NewSession(conversationID) // một session cho mỗi cuộc hội thoại
 
 lang := guardrail.DetectLanguage(message)
-in, _ := guard.CheckInput(ctx, message, nil)
+in, _ := guard.CheckInput(ctx, message, &guardrail.CheckOptions{Session: session})
+session.Record("user", message, in)
 if held, ok := responder.BlockingResponse([]guardrail.Verdict{in}, lang); ok {
+	session.Advance()
 	return held
 }
-reply := callModel(message)
-out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{UserMessage: message})
-return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
+reply := callModel(responder.ModelHistory(session, lang)) // lượt bị chặn được thay bằng ghi chú nêu nhóm
+out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{Session: session, UserMessage: message})
+sent := responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
+session.Record("assistant", sent, out)
+session.Advance()
+return sent
 ```
 
 ## Bước 5. Dùng câu trả lời viết sẵn, không để mô hình tự viết
@@ -95,6 +101,15 @@ return responder.Compose(reply, []guardrail.Verdict{in, out}, lang)
    `Responder(policy, crisis_line="...")`.
 5. Nội dung đang chờ nhân viên xem xét nhận thông báo trung tính, không kết luận người dùng vi phạm.
 6. Khi hệ thống kiểm duyệt gián đoạn, người dùng nhận thông báo gián đoạn, không bị buộc tội.
+7. Câu trả lời nêu đúng điều đã khiến nội dung bị chặn: bạo lực và vũ khí, xâm hại trẻ em, tội
+   phạm, nội dung khiêu dâm, thù ghét, vượt qua thiết lập an toàn, bản quyền, cùng các nhóm theo pháp
+   luật Việt Nam. Câu trả lời khủng hoảng chỉ dùng khi tự hại là mối lo **dẫn đầu**. Một yêu cầu chế
+   tạo thứ phá hủy tòa nhà nhận câu trả lời về bạo lực; nếu tín hiệu tự hại vẫn vượt ngưỡng chặn, câu
+   trả lời có thêm một dòng hướng dẫn gọi **115**.
+8. Sau một lượt bị chặn, gửi cho mô hình `responder.ModelHistory(session, lang)` thay vì lịch sử
+   thô. Lượt bị chặn được thay bằng một ghi chú nêu nhóm vi phạm (không bao giờ chứa nội dung gốc) và
+   câu trả lời người dùng đã nhận. Nhờ vậy, khi người dùng nói "làm đi" hay "yêu cầu đầu tiên của
+   tôi", mô hình biết mình đã từ chối điều gì, thay vì đoán hoặc nói không thấy tin nhắn.
 
 ## Bước 6. Không chặn nhầm câu hỏi bình thường
 

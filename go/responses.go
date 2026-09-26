@@ -66,6 +66,11 @@ type responsesSpec struct {
 	Groups            map[string]responseGroup `json:"groups"`
 	Review            texts                    `json:"review"`
 	Unavailable       texts                    `json:"unavailable"`
+	CrisisFooter      texts                    `json:"crisis_footer"`
+	Withheld          struct {
+		Note   texts            `json:"note"`
+		Labels map[string]texts `json:"labels"`
+	} `json:"withheld"`
 	Affirmation       struct {
 		TriggerSignal string   `json:"trigger_signal"`
 		TriggerValue  *float64 `json:"trigger_value"`
@@ -76,6 +81,7 @@ type responsesSpec struct {
 
 // Responder selects the prewritten reply for a set of verdicts. It is safe for concurrent use.
 type Responder struct {
+	policy         *Policy
 	spec           responsesSpec
 	hasAffirmation bool
 	crisisLine     string
@@ -94,7 +100,7 @@ func NewResponder(p *Policy, crisisLine string) (*Responder, error) {
 	if !ok {
 		return nil, fmt.Errorf("policy %q has no responses section", p.ID)
 	}
-	r := &Responder{byCategory: map[string]string{}}
+	r := &Responder{policy: p, byCategory: map[string]string{}}
 	if err := json.Unmarshal(raw, &r.spec); err != nil {
 		return nil, fmt.Errorf("policy %q responses: %w", p.ID, err)
 	}
@@ -193,12 +199,18 @@ func (r *Responder) Choose(verdicts []Verdict, lang string) (Choice, bool) {
 		text = r.groupText(group, lang)
 	default:
 		group = r.groupFor(held)
-		if verdict.Route == RouteHumanReview && group != "self_harm" {
+		if verdict.Route == RouteHumanReview {
 			// Held for a person, not refused: telling the user they broke the law before anyone
 			// has looked would be the wrong message for a borderline case.
 			group, text = "review", r.text(r.spec.Review, lang)
 		} else {
 			text = r.groupText(group, lang)
+		}
+		// Self-harm that reached its block band without leading the turn, beside a request to hurt
+		// others, still gets the number to call: the reply names what stopped the content, and
+		// the line is there in case the person is also at risk.
+		if footer := r.crisisFooter(held, lang); footer != "" {
+			text += "\n\n" + footer
 		}
 	}
 
@@ -253,6 +265,10 @@ func (r *Responder) groupFor(verdicts []Verdict) string {
 		}
 	}
 	for _, name := range r.spec.Order {
+		// The crisis reply comes only from the crisis route, which is set when self-harm leads.
+		if name == "self_harm" {
+			continue
+		}
 		for _, c := range r.spec.Groups[name].Categories {
 			if fired[c] {
 				return name
@@ -265,6 +281,65 @@ func (r *Responder) groupFor(verdicts []Verdict) string {
 		}
 	}
 	return r.spec.Order[len(r.spec.Order)-1]
+}
+
+// crisisFooter is the crisis line to add to a reply that is not the crisis reply, when a held
+// verdict carries a self-harm probability at or over its own block band. The band is read from the
+// probability, not the finding's action: a rule that hardens every finding on a request for
+// capability lifts a self-harm answer of 0.15 to block on "how do I bring down a bridge", and a
+// crisis line under every refusal would be noise.
+func (r *Responder) crisisFooter(held []Verdict, lang string) string {
+	for _, v := range held {
+		for _, f := range v.Findings {
+			if !slices.Contains(r.spec.Groups["self_harm"].Categories, f.Category) || Rank(f.Action) < Rank(Flag) {
+				continue
+			}
+			cat, ok := r.policy.Categories[f.Category]
+			if !ok {
+				continue
+			}
+			if bands, ok := cat.Threshold(v.Surface); ok && f.Probability >= bands.Block {
+				return strings.ReplaceAll(r.text(r.spec.CrisisFooter, lang), "{crisis_line}", r.crisisLine)
+			}
+		}
+	}
+	return ""
+}
+
+// ModelHistory is the session's transcript for the chat model, with each withheld turn told rather
+// than dropped. A withheld user message becomes a note naming its group, followed by the reply the
+// user was shown; a withheld reply becomes the reply the user was shown.
+//
+// Session.ModelHistory drops withheld turns, so after a refusal the model meets "do it" or "my
+// first request" with nothing before it, and guesses. The note names the group, never the text,
+// so the model knows what it declined without being able to act on it.
+func (r *Responder) ModelHistory(s *Session, lang string) []Turn {
+	var out []Turn
+	for i, t := range s.Turns {
+		if t.Content != WithheldPlaceholder {
+			out = append(out, Turn{Role: t.Role, Content: t.Content})
+			continue
+		}
+		var held []Verdict
+		if v := s.heldVerdict(i); v != nil {
+			held = append(held, *v)
+		}
+		c, ok := r.Choose(held, lang)
+		if !ok || c.Group == "affirmation" {
+			// A turn recorded without its verdict, or one that is not withheld after all.
+			c = Choice{Group: "general", Text: r.groupText("general", lang)}
+		}
+		if t.Role != "user" {
+			out = append(out, Turn{Role: t.Role, Content: c.Text})
+			continue
+		}
+		label := r.text(r.spec.Withheld.Labels[c.Group], lang)
+		out = append(out, Turn{Role: "user", Content: strings.ReplaceAll(r.text(r.spec.Withheld.Note, lang), "{label}", label)})
+		if i+1 >= len(s.Turns) || s.Turns[i+1].Role != "assistant" {
+			out = append(out, Turn{Role: "assistant", Content: c.Text})
+		}
+	}
+	return out
 }
 
 func (r *Responder) touchesSovereignty(v Verdict) bool {
@@ -355,7 +430,24 @@ func (r *Responder) check() error {
 			}
 		}
 	}
+	if _, ok := r.spec.Groups["general"]; !ok {
+		missing = append(missing, `group "general" is not defined`)
+	}
+	labelled := append(slices.Clone(r.spec.Order), "self_harm", "general", "review", "unavailable")
+	slices.Sort(labelled)
+	labelled = slices.Compact(labelled)
 	for _, lang := range r.spec.Languages {
+		if r.spec.CrisisFooter[lang] == "" {
+			missing = append(missing, "crisis_footer."+lang)
+		}
+		if r.spec.Withheld.Note[lang] == "" {
+			missing = append(missing, "withheld.note."+lang)
+		}
+		for _, name := range labelled {
+			if r.spec.Withheld.Labels[name][lang] == "" {
+				missing = append(missing, "withheld.labels."+name+"."+lang)
+			}
+		}
 		if r.spec.Review[lang] == "" {
 			missing = append(missing, "review."+lang)
 		}
