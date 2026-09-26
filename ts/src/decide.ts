@@ -500,8 +500,14 @@ export function resolveRoute(policy: Policy, findings: readonly Finding[], actio
   // Only a finding that still counts sets the handling. One a rule capped to allow is a record,
   // and a sentinel the hazard choice does not back, still at flag, must not replace an ordinary
   // answer with a crisis message.
+  //
+  // The crisis route answers only when self-harm leads. The self-harm sentinel answers 0.15 to 0.66
+  // on a request to build a bomb or bring down a building, which is about harming others; a crisis
+  // message in reply answers the wrong question. The finding keeps its action, so the content is
+  // still held.
   const hazardRoute = findings
-    .filter((f) => rank(f.action) >= rank("flag") && !(f.uncorroborated && f.action === "flag"))
+    .filter(routeCounts)
+    .filter((f) => policy.categories.get(f.category)?.route !== "crisis_support" || leads(f, findings))
     .map((f) => policy.categories.get(f.category)?.route)
     .find((route): route is NonNullable<typeof route> => !!route && CATEGORY_ROUTES.has(route));
 
@@ -510,6 +516,24 @@ export function resolveRoute(policy: Policy, findings: readonly Finding[], actio
   if (action === "allow") return "deliver";
   if (hazardRoute === "redact" || hazardRoute === "guide") return hazardRoute;
   return action === "review" ? "human_review" : "deliver";
+}
+
+/** Whether a finding can set the handling. */
+function routeCounts(f: Finding): boolean {
+  return rank(f.action) >= rank("flag") && !(f.uncorroborated && f.action === "flag");
+}
+
+/**
+ * No other finding that counts is ahead of `f`: none at a stronger action, and none at the same
+ * action with a higher probability. A tie goes to `f`.
+ */
+function leads(f: Finding, findings: readonly Finding[]): boolean {
+  return !findings.some(
+    (g) =>
+      g.category !== f.category &&
+      routeCounts(g) &&
+      (rank(g.action) > rank(f.action) || (g.action === f.action && g.probability > f.probability)),
+  );
 }
 
 function severityOf(
