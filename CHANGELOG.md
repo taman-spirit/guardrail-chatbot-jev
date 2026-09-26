@@ -3,11 +3,11 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Go multi-turn v1] - 2026-09-26
+## [Go 1.2.0, Python 1.1.0] - 2026-09-26
 
 ### Changed
 
-- Multi-turn: a turn is held only for what it or its reply does. The input check never reads the
+- Multi-turn, in Go, Python and TypeScript (the Go engine was first released as `go-multiturn-v1`): a turn is held only for what it or its reply does. The input check never reads the
   history; in a watched session the reply is also read in context, and those findings count only
   when the reply completes an earlier harmful request. `MultiturnFloor` keeps the earlier floor.
 - Withheld turns are kept as `[earlier message omitted]` and left out of `Session.ModelHistory()`;
