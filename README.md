@@ -42,18 +42,18 @@ stack cannot drift apart. Neither package has a third-party dependency.
 
 | Release | Tag | What it is | Licence |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.2) | `python/v1.1.2` | The Python and TypeScript package: three checks, multi-turn attribution, realtime review, cache, prefilter, sessions, streaming, offline tuning and the CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.2) | `go/v1.2.2` | The same engine in Go, with the live, replay and regression test tools | CC BY-NC 4.0 |
-| [Python: Viet Nam compliance policy v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.1) | `python-vietnam-compliance-v1.2.1` | The `vietnam-compliance-v1` policy, with prewritten replies in Vietnamese, English and Chinese | CC BY-NC 4.0 |
-| [Go: Viet Nam compliance policy v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.1) | `go-vietnam-compliance-v1.2.1` | The same policy and replies in Go, as module version `v1.3.1` | CC BY-NC 4.0 |
+| [Python SDK 1.1.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.3) | `python/v1.1.3` | The Python and TypeScript package: three checks, multi-turn attribution, realtime review, cache, prefilter, sessions, streaming, offline tuning and the CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.3) | `go/v1.2.3` | The same engine in Go, with the live, replay and regression test tools | CC BY-NC 4.0 |
+| [Python: Viet Nam compliance policy v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.2) | `python-vietnam-compliance-v1.2.2` | The `vietnam-compliance-v1` policy, with prewritten replies in Vietnamese, English and Chinese | CC BY-NC 4.0 |
+| [Go: Viet Nam compliance policy v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.2) | `go-vietnam-compliance-v1.2.2` | The same policy and replies in Go, as module version `v1.3.2` | CC BY-NC 4.0 |
 
 Each release note lists what the release contains and how to install it. In the same order:
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.2
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.1#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.1
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.3#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.3
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.2#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.2
 ```
 
 Python and TypeScript live on `main`; Go on `go-sdk`; the Viet Nam policy on

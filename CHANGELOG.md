@@ -3,6 +3,18 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Go 1.2.3, Python 1.1.3] - 2026-09-26
+
+### Fixed
+
+- Go, Python and TypeScript: a request to hurt others is no longer routed to crisis support. The
+  crisis route is taken only when self-harm leads the turn: no other finding at a stronger action,
+  or at the same action with a higher probability (a tie goes to self-harm). Measured on Jev, the
+  self-harm sentinel answers 0.15 to 0.66 on requests to build a bomb or bring down a building, and
+  every one of seven such requests was routed to crisis support; now none is, and all seven
+  self-harm messages still are. The action is unchanged: the content is still held. The three
+  engines agree on 40,000 random answer sets.
+
 ## [Go 1.2.2, Python 1.1.2] - 2026-09-26
 
 ### Documentation

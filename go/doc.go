@@ -16,4 +16,4 @@
 package guardrail
 
 // Version is the package version, kept in step with the Python and TypeScript packages.
-const Version = "1.2.2"
+const Version = "1.2.3"
