@@ -274,6 +274,9 @@ type SentinelCorroboration struct {
 	// WeakAtMostFlag caps an uncorroborated sentinel below its block band at flag: it is recorded
 	// and delivered, rather than held, unless it crosses the block band on its own.
 	WeakAtMostFlag bool
+	// RedactInsteadOfBlockBelow resolves an uncorroborated sentinel for a category handled by
+	// redaction to review, so it is masked and delivered, unless it reaches this value. Zero is off.
+	RedactInsteadOfBlockBelow float64
 }
 
 // ConfidenceGateOptions narrow when a low-confidence answer escalates to review.
@@ -307,11 +310,12 @@ func (p *Policy) SentinelCorroboration() (SentinelCorroboration, bool) {
 		return SentinelCorroboration{}, false
 	}
 	c := SentinelCorroboration{
-		MinChoice:          floatOr(raw["min_choice"], 0.02),
-		Refusal:            floatOr(raw["refusal"], 0.8),
-		RefusalMaxSentinel: floatOr(raw["refusal_max_sentinel"], 0.5),
-		RefusalExcept:      map[string]bool{},
-		WeakAtMostFlag:     truthy(raw["weak_at_most_flag"]),
+		MinChoice:                 floatOr(raw["min_choice"], 0.02),
+		Refusal:                   floatOr(raw["refusal"], 0.8),
+		RefusalMaxSentinel:        floatOr(raw["refusal_max_sentinel"], 0.5),
+		RefusalExcept:             map[string]bool{},
+		WeakAtMostFlag:            truthy(raw["weak_at_most_flag"]),
+		RedactInsteadOfBlockBelow: floatOr(raw["redact_instead_of_block_below"], 0),
 	}
 	for _, id := range stringsOf(raw["refusal_except"]) {
 		c.RefusalExcept[id] = true

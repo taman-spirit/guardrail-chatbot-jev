@@ -50,6 +50,19 @@ func Decide(p *Policy, surface Surface, answers Answers, opts DecideOptions) Ver
 	if checkCorroboration && surface == SurfaceOutput {
 		findings = capUncorroboratedOnRefusal(findings, signals, corroboration)
 	}
+	if checkCorroboration && corroboration.RedactInsteadOfBlockBelow > 0 {
+		// Measured: a reply with a first name in it ("Kính gửi anh Nam") drew s_prv 0.40 to 0.50
+		// with the choice at 0.01. Personal data is handled by masking it; blocking the whole reply
+		// on a sentinel alone is the wrong remedy.
+		for i, f := range findings {
+			if f.Uncorroborated && f.Action == Block && f.Probability < corroboration.RedactInsteadOfBlockBelow &&
+				p.Categories[f.Category].Route == RouteRedact {
+				f.Notes = append(append([]string(nil), f.Notes...), "uncorroborated sentinel on a redacted category: block -> review")
+				f.Action = Review
+				findings[i] = f
+			}
+		}
+	}
 	if checkCorroboration && corroboration.WeakAtMostFlag {
 		for i, f := range findings {
 			if f.weak && Rank(f.Action) > Rank(Flag) {

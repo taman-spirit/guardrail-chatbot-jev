@@ -323,3 +323,25 @@ func TestAConversationGoingNowhereIsNotSentToReview(t *testing.T) {
 		}
 	}
 }
+
+func TestAnUncorroboratedPersonalDataSentinelIsMaskedNotBlocked(t *testing.T) {
+	p := bundled(t)
+	// "Kính gửi anh Nam, em xin phép nghỉ...", measured: s_prv 0.50, choice prv 0.01.
+	v := decideOn(p, SurfaceOutput, answers(A{"hazard": hazard(P{"prv": 0.01}), "s_prv": noul(0.5), "refusal": noul(0)}))
+	if v.Action != Review || v.Route != RouteRedact || !v.Deliverable() {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+	// A strong or corroborated one still blocks.
+	for _, a := range []Answers{
+		answers(A{"hazard": hazard(P{"prv": 0.01}), "s_prv": noul(0.85), "refusal": noul(0)}),
+		answers(A{"hazard": hazard(P{"prv": 0.3}), "s_prv": noul(0.6), "refusal": noul(0)}),
+	} {
+		if v := decideOn(p, SurfaceOutput, a); v.Action != Block {
+			t.Fatalf("got %s %s", v.Action, v.Route)
+		}
+	}
+	// It is only for categories handled by redaction: cse still blocks.
+	if v := decideOn(p, SurfaceInput, answers(A{"s_cse": noul(0.3)})); v.Action != Block {
+		t.Fatalf("cse got %s", v.Action)
+	}
+}

@@ -416,3 +416,62 @@ func TestReplayConversation(t *testing.T) {
 	}
 	t.Log(b.String())
 }
+
+// TestReplayRealtime asks what changes when review stops meaning "hold": only block stops
+// content, and review and flag are delivered and queued for audit. Harmless samples are counted
+// as stopped only when blocked; a violation labelled block must be stopped, one labelled review
+// only has to reach the audit queue.
+func TestReplayRealtime(t *testing.T) {
+	pattern := os.Getenv("REPLAY_DIRS")
+	if pattern == "" {
+		t.Skip("REPLAY_DIRS is not set")
+	}
+	want := map[string]Action{}
+	cat := map[string]string{}
+	for _, set := range []string{"../examples/cases-input.jsonl", "../examples/cases-output.jsonl"} {
+		for _, c := range readRows(t, set) {
+			want[c["text"].(string)] = Action(c["expected_action"].(string))
+			if s, ok := c["expected_category"].(string); ok {
+				cat[c["text"].(string)] = s
+			}
+		}
+	}
+	p := bundled(t)
+	samples := loadSamples(t)
+	var benign, benignStopped, benignQueued int
+	type tally struct{ n, ok int }
+	byLabel := map[Action]*tally{Block: {}, Review: {}}
+	leaks := map[string]int{}
+	for _, s := range samples {
+		v := Decide(p, s.surface, s.answers, DecideOptions{})
+		stopped := v.Action == Block || v.Route == RouteCrisisSupport
+		queued := Rank(v.Action) >= Rank(Review)
+		if !s.harmful {
+			benign++
+			if stopped {
+				benignStopped++
+			} else if queued {
+				benignQueued++
+			}
+			continue
+		}
+		label := want[s.text]
+		tl := byLabel[label]
+		tl.n++
+		switch {
+		case label == Block && stopped, label == Review && (queued || stopped):
+			tl.ok++
+		case label == Block:
+			leaks[fmt.Sprintf("%s (%s) decided %s", cat[s.text], string(s.surface), v.Action)]++
+		}
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "\nharmless samples: %d  stopped (blocked): %d (%.2f%%)  delivered but queued for audit: %d (%.2f%%)\n",
+		benign, benignStopped, 100*ratio(benignStopped, benign), benignQueued, 100*ratio(benignQueued, benign))
+	fmt.Fprintf(&b, "violations labelled block:  stopped %d/%d (%.1f%%)\n", byLabel[Block].ok, byLabel[Block].n, 100*ratio(byLabel[Block].ok, byLabel[Block].n))
+	fmt.Fprintf(&b, "violations labelled review: at least queued %d/%d (%.1f%%)\n", byLabel[Review].ok, byLabel[Review].n, 100*ratio(byLabel[Review].ok, byLabel[Review].n))
+	for k, n := range leaks {
+		fmt.Fprintf(&b, "  labelled block but delivered (queued): %4dx %s\n", n, k)
+	}
+	t.Log(b.String())
+}

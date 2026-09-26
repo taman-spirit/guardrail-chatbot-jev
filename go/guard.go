@@ -35,7 +35,22 @@ type Options struct {
 	Multiturn MultiturnMode
 	// ContextCheck tunes the in-context output check that MultiturnAttribute uses.
 	ContextCheck ContextCheck
+	// ReviewHandling says what a review verdict does to the content; see ReviewAsAudit.
+	ReviewHandling ReviewHandling
 }
+
+// ReviewHandling says what a review verdict does to the content.
+type ReviewHandling int
+
+const (
+	// ReviewHold withholds content at review until a person has looked at it.
+	ReviewHold ReviewHandling = iota
+	// ReviewAsAudit is for realtime chat, where nobody can look before the reply is due: review
+	// delivers the content and queues it for a person afterwards. Only block stops content, and
+	// crisis support still replaces it. A degraded verdict is not affected: when Jev could not be
+	// reached nothing was checked, so a fail-closed surface still holds.
+	ReviewAsAudit
+)
 
 // CheckOptions are per-check details. Fields that do not apply to a check are ignored.
 type CheckOptions struct {
@@ -267,6 +282,7 @@ func (g *Guard) call(ctx context.Context, state State, questions Questions, mode
 // finish applies the session floor (MultiturnFloor only), tells the session, and emits to the
 // observer.
 func (g *Guard) finish(v Verdict, session *Session) Verdict {
+	v = g.audit(v)
 	if session != nil {
 		if floor := session.Floor(); floor != Allow && g.opts.Multiturn == MultiturnFloor {
 			id := session.ID
@@ -279,6 +295,20 @@ func (g *Guard) finish(v Verdict, session *Session) Verdict {
 	}
 	if g.opts.Observer != nil {
 		g.opts.Observer(v)
+	}
+	return v
+}
+
+// audit marks what a person should look at later, and under ReviewAsAudit lets a review through.
+func (g *Guard) audit(v Verdict) Verdict {
+	switch {
+	case Rank(v.Action) >= Rank(Review):
+		v.Audit = "priority"
+	case v.Action == Flag:
+		v.Audit = "sample"
+	}
+	if g.opts.ReviewHandling == ReviewAsAudit && v.Route == RouteHumanReview && !v.Degraded {
+		v.Route = RouteDeliverAndAudit
 	}
 	return v
 }

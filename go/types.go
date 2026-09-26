@@ -36,6 +36,9 @@ const (
 	RouteCrisisSupport Route = "crisis_support"
 	RouteHumanReview   Route = "human_review"
 	RouteSafeResponse  Route = "safe_response"
+	// RouteDeliverAndAudit sends the content now and queues it for a person to look at later; see
+	// ReviewAsAudit.
+	RouteDeliverAndAudit Route = "deliver_and_audit"
 )
 
 // Surfaces lists every surface, in the order the checks run.
@@ -157,6 +160,9 @@ type Verdict struct {
 	Prefilter string
 	// Context is what the in-context output check found, when it ran.
 	Context *ContextRead
+	// Audit says whether a person should look at this later: "priority" for review or worse,
+	// "sample" for a flag, "" for nothing. It is independent of whether the content was delivered.
+	Audit string
 }
 
 // Allowed is true when the content may be delivered as-is or with a flag only.
@@ -238,6 +244,7 @@ func (v Verdict) MarshalJSON() ([]byte, error) {
 		"prefilter":     nullable(v.Prefilter),
 		"error":         nullable(v.Error),
 		"context":       v.Context,
+		"audit":         nullable(v.Audit),
 	})
 }
 

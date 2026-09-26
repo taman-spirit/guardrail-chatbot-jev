@@ -429,3 +429,31 @@ func TestATranscriptOfOnlyWithheldTurnsIsNotSent(t *testing.T) {
 		t.Fatal("a transcript with real content must still be checked")
 	}
 }
+
+func TestReviewAsAuditDeliversNowAndQueues(t *testing.T) {
+	reviewing := Answers{"hazard": {"type": "choice", "choice": "ncr", "confidence": 0.9, "probabilities": map[string]any{"ncr": 0.35, "none": 0.65}},
+		"actionability": score(2), "intent": choice("seeking_information")}
+	hold := New(Options{Transport: NewRecordedTransport(reviewing)})
+	live := New(Options{Transport: NewRecordedTransport(reviewing), ReviewHandling: ReviewAsAudit})
+	h, _ := hold.CheckInput(ctx, "x", nil)
+	l, _ := live.CheckInput(ctx, "x", nil)
+	if h.Action != Review || h.Deliverable() || h.Audit != "priority" {
+		t.Fatalf("hold: %s %s %q", h.Action, h.Route, h.Audit)
+	}
+	if l.Action != Review || !l.Deliverable() || l.Route != RouteDeliverAndAudit || l.Audit != "priority" {
+		t.Fatalf("audit: %s %s %q", l.Action, l.Route, l.Audit)
+	}
+	// A block still stops, and crisis support still replaces.
+	blocking := answers(A{"hazard": hazard(P{"iwp": 0.7}), "s_iwp": noul(0.9), "actionability": score(2.5)})
+	if v, _ := New(Options{Transport: NewRecordedTransport(blocking), ReviewHandling: ReviewAsAudit}).CheckInput(ctx, "x", nil); v.Deliverable() {
+		t.Fatal("a block was delivered")
+	}
+	crisis := answers(A{"s_ssh": noul(0.2), "hazard": hazard(P{"ssh": 0.1})})
+	if v, _ := New(Options{Transport: NewRecordedTransport(crisis), ReviewHandling: ReviewAsAudit}).CheckInput(ctx, "x", nil); v.Route != RouteCrisisSupport {
+		t.Fatalf("got %s", v.Route)
+	}
+	// With Jev down, a fail-closed output still holds: nothing was checked.
+	if v, _ := New(Options{Transport: failing, ReviewHandling: ReviewAsAudit}).CheckOutput(ctx, "x", nil); v.Deliverable() {
+		t.Fatalf("a degraded review was delivered: %s", v.Route)
+	}
+}

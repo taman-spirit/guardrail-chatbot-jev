@@ -25,7 +25,8 @@
       "refusal": 0.8,
       "refusal_max_sentinel": 0.5,
       "refusal_except": ["sid", "prv", "ipv"],
-      "weak_at_most_flag": true
+      "weak_at_most_flag": true,
+      "redact_instead_of_block_below": 0.8
     },
     "confidence_gate": {
       "skip_when_intent": ["benign"],

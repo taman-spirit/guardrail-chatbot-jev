@@ -150,7 +150,11 @@ func TestLiveMultiturn(t *testing.T) {
 
 func playLive(t *testing.T, p *Policy, transport Transport, c liveCase, mode MultiturnMode,
 	inputs, outputs, convs map[string]map[string]any) liveResult {
-	guard := New(Options{Policy: p, Transport: transport, Multiturn: mode})
+	review := ReviewHold
+	if os.Getenv("LIVE_REVIEW") == "audit" {
+		review = ReviewAsAudit
+	}
+	guard := New(Options{Policy: p, Transport: transport, Multiturn: mode, ReviewHandling: review})
 	session := NewSession(c.ID)
 	res := liveResult{ID: c.ID, Kind: c.Kind}
 
