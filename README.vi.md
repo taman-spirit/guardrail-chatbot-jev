@@ -269,14 +269,14 @@ lượt đó được đọc kỹ đến đâu, không quyết định nó có b
 
 ### Phương pháp
 
-| Thành phần | Quy tắc |
-| --- | --- |
-| Kiểm tra input | Chỉ đọc `q_t`. Không lịch sử, không điểm rủi ro session. |
-| Kiểm tra output | Đọc riêng `r_t`. Khi session đang được theo dõi, đọc thêm `r_t` kèm `H_t`, bằng một request song song. |
-| Quy lỗi | Phát hiện có ngữ cảnh chỉ được tính khi câu trả lời hoàn tất một yêu cầu có hại trước đó. |
-| Lượt bị giữ | Lưu dạng `[earlier message omitted]`; không có trong `Session.ModelHistory()`. |
-| Kiểm tra hội thoại | Chỉ theo dõi, không giữ lượt. Tối đa `flag` khi escalation ≤ 0.5. |
-| Streaming | Khi session đang được theo dõi, câu trả lời chỉ được gửi sau lần kiểm tra cuối có ngữ cảnh. |
+| Thành phần | Quy tắc | Code |
+| --- | --- | --- |
+| Kiểm tra input | Chỉ đọc `q_t`. Không lịch sử, không điểm rủi ro session. | [`CheckInput`](go/guard.go#L118), [`Session.Metadata`](go/session.go#L111) |
+| Kiểm tra output | Đọc riêng `r_t`. Khi session đang được theo dõi, đọc thêm `r_t` kèm `H_t`, bằng một request song song. | [`CheckOutput`](go/guard.go#L128), [`contextCheckApplies`](go/multiturn.go#L133), [`checkInContext`](go/multiturn.go#L148) |
+| Quy lỗi | Phát hiện có ngữ cảnh chỉ được tính khi câu trả lời hoàn tất một yêu cầu có hại trước đó. | [`attribute`](go/multiturn.go#L166), [`ContextQuestions`](go/multiturn.go#L76) |
+| Lượt bị giữ | Lưu dạng `[earlier message omitted]`; không có trong `Session.ModelHistory()`. | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| Kiểm tra hội thoại | Chỉ theo dõi, không giữ lượt. Tối đa `flag` khi escalation ≤ 0.5. | [`CheckConversation`](go/guard.go#L166), [`rule`](policies/standard-v1.json#L699) |
+| Streaming | Khi session đang được theo dõi, câu trả lời chỉ được gửi sau lần kiểm tra cuối có ngữ cảnh. | [`Stream`](go/streaming.go#L74) |
 
 ### Định nghĩa
 
@@ -285,6 +285,8 @@ Jev cho trạng thái `x`, `D(s, a)` quyết định theo policy trên bề mặ
 lấy phát hiện mạnh hơn).
 
 ```
+
+Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
 V_in(t)   = D(input,  J(q_t))
 V_out(t)  = D(output, J(r_t))
 
@@ -297,6 +299,8 @@ V(t)      = V_out(t) ⊕ V_ctx  nếu A_t,  ngược lại V_out(t)
 risk_t+1  = max(δ · risk_t, ρ(hành động)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) cho (allow, flag, review, block)
 carry     = 2 lượt sau một verdict hội thoại ≥ review hoặc bất kỳ block nào
 ```
+
+Code: `u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
 
 ### Hiệu chỉnh đơn lượt
 
@@ -319,7 +323,7 @@ pháp luật.
 
 ### Xử lý review trong chat realtime
 
-`ReviewHandling: ReviewAsAudit`. Chỉ `block` dừng nội dung; mọi verdict có mức `audit`.
+`ReviewHandling: ReviewAsAudit` ([`ReviewAsAudit`](go/guard.go#L52), [`audit`](go/guard.go#L303)). Chỉ `block` dừng nội dung; mọi verdict có mức `audit`.
 
 | Verdict | Người dùng nhận | Hậu kiểm |
 | --- | --- | --- |
@@ -334,13 +338,13 @@ pháp luật.
 
 | Bộ dữ liệu | Cỡ | Nội dung | Nhãn |
 | --- | --- | --- | --- |
-| `examples/multiturn-live.jsonl` | 223 hội thoại | vi phạm đơn lẻ, lặp lại, xen kẽ; lịch sử vượt cửa sổ; leo thang | kết quả kỳ vọng từng case; vi phạm tham chiếu bằng id từ các bộ có nhãn |
-| `examples/multiturn-contamination.jsonl` | 26 kịch bản | câu trả lời Jev giả lập | kết quả kỳ vọng từng case |
-| `examples/cases-input.jsonl`, `cases-output.jsonl` | 51 case | đơn lượt | hành động kỳ vọng |
+| [`examples/multiturn-live.jsonl`](examples/multiturn-live.jsonl) | 223 hội thoại | vi phạm đơn lẻ, lặp lại, xen kẽ; lịch sử vượt cửa sổ; leo thang | kết quả kỳ vọng từng case; vi phạm tham chiếu bằng id từ các bộ có nhãn |
+| [`examples/multiturn-contamination.jsonl`](examples/multiturn-contamination.jsonl) | 26 kịch bản, [`TestMultiturnScenarios`](go/multiturn_test.go#L165) | câu trả lời Jev giả lập | kết quả kỳ vọng từng case |
+| [`cases-input.jsonl`](examples/cases-input.jsonl), [`cases-output.jsonl`](examples/cases-output.jsonl) | 51 case | đơn lượt | hành động kỳ vọng |
 
-Quy trình: **chạy thật** (Jev, cả hai thiết kế, ghi lại mọi câu trả lời thô); **chấm lại** (khoảng
+Quy trình: **chạy thật** [`TestLiveMultiturn`](go/live_multiturn_test.go#L96) (Jev, cả hai thiết kế, ghi lại mọi câu trả lời thô); **chấm lại** [`TestReplayVariants`](go/replay_test.go#L224), [`TestReplayConversation`](go/replay_test.go#L300), [`TestReplayRealtime`](go/replay_test.go#L424) (khoảng
 5.000 câu trả lời đã ghi được quyết định lại theo từng phương án, nên các phương án được so trên cùng dữ
-liệu); **nhiễu** (câu trả lời giả lập bị thêm nhiễu, σ ∈ {0.05, 0.1, 0.2}); **hồi quy** (bộ đơn lượt,
+liệu); **nhiễu** [`TestMultiturnAttributionUnderNoise`](go/multiturn_test.go#L233) (câu trả lời giả lập bị thêm nhiễu, σ ∈ {0.05, 0.1, 0.2}); **hồi quy** [`TestLiveSingleTurnRegression`](go/live_multiturn_test.go#L338) (bộ đơn lượt,
 trước và sau). Chỉ số: tỷ lệ giữ câu vô hại (FPR), tỷ lệ bắt vi phạm (recall), tỷ lệ vào hàng đợi
 xem xét.
 

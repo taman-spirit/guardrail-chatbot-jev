@@ -274,14 +274,14 @@ closely a turn is read, never whether it is withheld.
 
 ### Method
 
-| Component | Rule |
-| --- | --- |
-| Input check | Reads `q_t` only. No history, no session risk. |
-| Output check | Reads `r_t` alone. In a watched session, also `r_t` given `H_t`, as a parallel request. |
-| Attribution | In-context findings count only if the reply completes an earlier harmful request. |
-| Withheld turns | Stored as `[earlier message omitted]`; excluded from `Session.ModelHistory()`. |
-| Conversation check | Monitoring only; never holds a turn. Capped at `flag` when escalation ≤ 0.5. |
-| Streaming | In a watched session the reply is released after the final in-context check. |
+| Component | Rule | Code |
+| --- | --- | --- |
+| Input check | Reads `q_t` only. No history, no session risk. | [`CheckInput`](go/guard.go#L118), [`Session.Metadata`](go/session.go#L111) |
+| Output check | Reads `r_t` alone. In a watched session, also `r_t` given `H_t`, as a parallel request. | [`CheckOutput`](go/guard.go#L128), [`contextCheckApplies`](go/multiturn.go#L133), [`checkInContext`](go/multiturn.go#L148) |
+| Attribution | In-context findings count only if the reply completes an earlier harmful request. | [`attribute`](go/multiturn.go#L166), [`ContextQuestions`](go/multiturn.go#L76) |
+| Withheld turns | Stored as `[earlier message omitted]`; excluded from `Session.ModelHistory()`. | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| Conversation check | Monitoring only; never holds a turn. Capped at `flag` when escalation ≤ 0.5. | [`CheckConversation`](go/guard.go#L166), [`rule`](policies/standard-v1.json#L699) |
+| Streaming | In a watched session the reply is released after the final in-context check. | [`Stream`](go/streaming.go#L74) |
 
 ### Definitions
 
@@ -289,6 +289,8 @@ closely a turn is read, never whether it is withheld.
 `x`, `D(s, a)` policy decision on surface `s`, `⊕` verdict merge (per category the stronger finding).
 
 ```
+
+Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
 V_in(t)   = D(input,  J(q_t))
 V_out(t)  = D(output, J(r_t))
 
@@ -301,6 +303,8 @@ V(t)      = V_out(t) ⊕ V_ctx  if A_t,  else V_out(t)
 risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) for (allow, flag, review, block)
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
+
+Code: `u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
 
 ### Single-turn calibration
 
@@ -323,7 +327,7 @@ about the law.
 
 ### Realtime review handling
 
-`ReviewHandling: ReviewAsAudit`. Only `block` stops content; every verdict carries an `audit` level.
+`ReviewHandling: ReviewAsAudit` ([`ReviewAsAudit`](go/guard.go#L52), [`audit`](go/guard.go#L303)). Only `block` stops content; every verdict carries an `audit` level.
 
 | Verdict | Delivered | Audit |
 | --- | --- | --- |
@@ -338,13 +342,13 @@ about the law.
 
 | Dataset | Size | Content | Labels |
 | --- | --- | --- | --- |
-| `examples/multiturn-live.jsonl` | 223 conversations | single, repeated and interleaved violations; histories beyond the window; escalations | expected outcome per case; violations referenced by id from the labelled sets |
-| `examples/multiturn-contamination.jsonl` | 26 scenarios | simulated Jev answers | expected outcome per case |
-| `examples/cases-input.jsonl`, `cases-output.jsonl` | 51 cases | single-turn | expected action |
+| [`examples/multiturn-live.jsonl`](examples/multiturn-live.jsonl) | 223 conversations | single, repeated and interleaved violations; histories beyond the window; escalations | expected outcome per case; violations referenced by id from the labelled sets |
+| [`examples/multiturn-contamination.jsonl`](examples/multiturn-contamination.jsonl) | 26 scenarios, [`TestMultiturnScenarios`](go/multiturn_test.go#L165) | simulated Jev answers | expected outcome per case |
+| [`cases-input.jsonl`](examples/cases-input.jsonl), [`cases-output.jsonl`](examples/cases-output.jsonl) | 51 cases | single-turn | expected action |
 
-Protocols: **live** (Jev, both designs, every raw answer recorded); **replay** (about 5,000 recorded
-answers decided again under each variant, so variants are compared on identical data); **noise**
-(simulated answers jittered, σ ∈ {0.05, 0.1, 0.2}); **regression** (single-turn sets, before and
+Protocols: **live** [`TestLiveMultiturn`](go/live_multiturn_test.go#L96) (Jev, both designs, every raw answer recorded); **replay** [`TestReplayVariants`](go/replay_test.go#L224), [`TestReplayConversation`](go/replay_test.go#L300), [`TestReplayRealtime`](go/replay_test.go#L424) (about 5,000 recorded
+answers decided again under each variant, so variants are compared on identical data); **noise** [`TestMultiturnAttributionUnderNoise`](go/multiturn_test.go#L233)
+(simulated answers jittered, σ ∈ {0.05, 0.1, 0.2}); **regression** [`TestLiveSingleTurnRegression`](go/live_multiturn_test.go#L338) (single-turn sets, before and
 after). Metrics: harmless hold rate (FPR), violation catch rate (recall), review-queue rate.
 
 **Live, 223 conversations**

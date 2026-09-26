@@ -259,18 +259,20 @@ finding）。
 
 ### 手法
 
-| 構成要素 | 規則 |
-| --- | --- |
-| 入力チェック | `q_t` のみを読む。履歴もセッションのリスクも使わない。 |
-| 出力チェック | `r_t` を単独で読む。監視中のセッションでは `r_t` を `H_t` 付きでも並列に読む。 |
-| 帰属 | 文脈付きの所見は、応答が以前の有害な依頼を完成させる場合にだけ数える。 |
-| 保留ターン | `[earlier message omitted]` として保持し、`Session.ModelHistory()` から除外する。 |
-| 会話チェック | 監視のみで保留しない。escalation ≤ 0.5 なら `flag` まで。 |
-| ストリーミング | 監視中のセッションでは、文脈付きの最終チェック後に応答を送る。 |
+| 構成要素 | 規則 | コード |
+| --- | --- | --- |
+| 入力チェック | `q_t` のみを読む。履歴もセッションのリスクも使わない。 | [`CheckInput`](go/guard.go#L118), [`Session.Metadata`](go/session.go#L111) |
+| 出力チェック | `r_t` を単独で読む。監視中のセッションでは `r_t` を `H_t` 付きでも並列に読む。 | [`CheckOutput`](go/guard.go#L128), [`contextCheckApplies`](go/multiturn.go#L133), [`checkInContext`](go/multiturn.go#L148) |
+| 帰属 | 文脈付きの所見は、応答が以前の有害な依頼を完成させる場合にだけ数える。 | [`attribute`](go/multiturn.go#L166), [`ContextQuestions`](go/multiturn.go#L76) |
+| 保留ターン | `[earlier message omitted]` として保持し、`Session.ModelHistory()` から除外する。 | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| 会話チェック | 監視のみで保留しない。escalation ≤ 0.5 なら `flag` まで。 | [`CheckConversation`](go/guard.go#L166), [`rule`](policies/standard-v1.json#L699) |
+| ストリーミング | 監視中のセッションでは、文脈付きの最終チェック後に応答を送る。 | [`Stream`](go/streaming.go#L74) |
 
 ### 定義
 
 ```
+
+コード：`V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
 V_in(t)   = D(input,  J(q_t))
 V_out(t)  = D(output, J(r_t))
 
@@ -283,6 +285,8 @@ V(t)      = V_out(t) ⊕ V_ctx  if A_t,  else V_out(t)
 risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) for (allow, flag, review, block)
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
+
+コード：`u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
 
 ### 単一ターンの較正
 
@@ -298,7 +302,7 @@ conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
 
 ### リアルタイムでのレビュー
 
-`ReviewHandling: ReviewAsAudit`：内容を止めるのは `block` のみ。`review` は配信して優先監査へ、`flag` は
+`ReviewHandling: ReviewAsAudit`： ([`ReviewAsAudit`](go/guard.go#L52), [`audit`](go/guard.go#L303))内容を止めるのは `block` のみ。`review` は配信して優先監査へ、`flag` は
 サンプリング監査へ回す。fail-closed の面の degraded 判定は保留のまま。
 
 ### 結果

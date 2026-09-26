@@ -276,18 +276,20 @@ détermine le degré d'attention porté au tour, jamais sa rétention.
 
 ### Méthode
 
-| Composant | Règle |
-| --- | --- |
-| Vérification d'entrée | Lit `q_t` seul. Ni historique, ni risque de session. |
-| Vérification de sortie | Lit `r_t` seul ; en session surveillée, aussi `r_t` sachant `H_t`, en requête parallèle. |
-| Attribution | Les constats en contexte ne comptent que si la réponse complète une demande nuisible antérieure. |
-| Tours retenus | Conservés sous la forme `[earlier message omitted]` ; exclus de `Session.ModelHistory()`. |
-| Vérification de conversation | Surveillance seulement ; plafonnée à `flag` si escalation ≤ 0,5. |
-| Streaming | En session surveillée, la réponse est délivrée après la vérification finale en contexte. |
+| Composant | Règle | Code |
+| --- | --- | --- |
+| Vérification d'entrée | Lit `q_t` seul. Ni historique, ni risque de session. | [`CheckInput`](go/guard.go#L118), [`Session.Metadata`](go/session.go#L111) |
+| Vérification de sortie | Lit `r_t` seul ; en session surveillée, aussi `r_t` sachant `H_t`, en requête parallèle. | [`CheckOutput`](go/guard.go#L128), [`contextCheckApplies`](go/multiturn.go#L133), [`checkInContext`](go/multiturn.go#L148) |
+| Attribution | Les constats en contexte ne comptent que si la réponse complète une demande nuisible antérieure. | [`attribute`](go/multiturn.go#L166), [`ContextQuestions`](go/multiturn.go#L76) |
+| Tours retenus | Conservés sous la forme `[earlier message omitted]` ; exclus de `Session.ModelHistory()`. | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L234) |
+| Vérification de conversation | Surveillance seulement ; plafonnée à `flag` si escalation ≤ 0,5. | [`CheckConversation`](go/guard.go#L166), [`rule`](policies/standard-v1.json#L699) |
+| Streaming | En session surveillée, la réponse est délivrée après la vérification finale en contexte. | [`Stream`](go/streaming.go#L74) |
 
 ### Définitions
 
 ```
+
+Code : `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
 V_in(t)   = D(input,  J(q_t))
 V_out(t)  = D(output, J(r_t))
 
@@ -300,6 +302,8 @@ V(t)      = V_out(t) ⊕ V_ctx  if A_t,  else V_out(t)
 risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) for (allow, flag, review, block)
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
+
+Code : `u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
 
 ### Calibrage mono-tour
 
@@ -315,7 +319,7 @@ conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
 
 ### Revue en temps réel
 
-`ReviewHandling: ReviewAsAudit` : seul `block` arrête le contenu ; `review` délivre et place en audit
+`ReviewHandling: ReviewAsAudit` ([`ReviewAsAudit`](go/guard.go#L52), [`audit`](go/guard.go#L303)) : seul `block` arrête le contenu ; `review` délivre et place en audit
 prioritaire, `flag` en audit par échantillonnage ; un verdict dégradé sur une surface fail-closed reste
 retenu.
 
