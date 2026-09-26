@@ -50,7 +50,12 @@ type ContextCheck struct {
 // WithheldPlaceholder stands in the transcript for a message the guardrail withheld. The attempt
 // stays visible to the conversation check, so repeated tries still show as a pattern, but its text
 // does not: neither Jev nor the model reads a blocked request again.
-const WithheldPlaceholder = "[message withheld by the safety check]"
+//
+// The wording is neutral on purpose. Measured against Jev, "[message withheld by the safety check]"
+// followed by a question about the weather still drew sentinel answers of 0.08 to 0.15, enough to
+// block on the lowest thresholds, because the words themselves suggest danger; "[earlier message
+// omitted]" drew 0.04 or less, about what no placeholder at all draws.
+const WithheldPlaceholder = "[earlier message omitted]"
 
 // Names of the questions the in-context check adds.
 const (

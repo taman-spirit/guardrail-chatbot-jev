@@ -413,3 +413,19 @@ func TestAnOutageOfTheInContextReadKeepsTheStandaloneVerdict(t *testing.T) {
 		t.Fatalf("%v %+v", err, out)
 	}
 }
+
+func TestATranscriptOfOnlyWithheldTurnsIsNotSent(t *testing.T) {
+	calls := 0
+	guard := New(Options{Transport: TransportFunc(func(context.Context, State, Questions, CallOptions) (Reply, error) {
+		calls++
+		return Reply{Answers: clean}, nil
+	})})
+	v, err := guard.CheckConversation(ctx, []Turn{{Role: "user", Content: WithheldPlaceholder}}, nil)
+	if err != nil || calls != 0 || v.Action != Allow || !v.HasRule("nothing-to-read") {
+		t.Fatalf("calls=%d %v %+v", calls, err, v)
+	}
+	_, _ = guard.CheckConversation(ctx, []Turn{{Role: "user", Content: WithheldPlaceholder}, {Role: "user", Content: "hi"}}, nil)
+	if calls != 1 {
+		t.Fatal("a transcript with real content must still be checked")
+	}
+}

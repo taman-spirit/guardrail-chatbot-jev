@@ -2,6 +2,7 @@ package guardrail
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"time"
 )
@@ -144,8 +145,17 @@ func (g *Guard) CheckOutput(ctx context.Context, reply string, opts *CheckOption
 //
 // Multi-turn jailbreaks look harmless turn by turn: the escalation is the attack. This check
 // reads the transcript as one state, and belongs off the critical path.
+//
+// A transcript with nothing in it but withheld turns is not sent: there is no content to read, and
+// Jev, asked to judge only omissions, answers from what they might have been.
 func (g *Guard) CheckConversation(ctx context.Context, turns []Turn, opts *CheckOptions) (Verdict, error) {
 	o := orEmpty(opts)
+	if !slices.ContainsFunc(turns, func(t Turn) bool { return t.Content != WithheldPlaceholder }) {
+		return g.finish(Verdict{
+			Action: Allow, Surface: SurfaceConversation, Route: RouteDeliver, Confidence: 1,
+			AppliedRules: []string{"nothing-to-read"}, PolicyID: g.Policy.QualifiedID(),
+		}, o.Session), nil
+	}
 	state := ConversationState(turns, mergedMetadata(o.Metadata, o.Session))
 	return g.run(ctx, SurfaceConversation, state, false, o.Model, o.Session, SubsetFull)
 }
