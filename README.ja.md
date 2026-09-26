@@ -36,25 +36,26 @@
 
 ## リリース
 
+**デモ：** Nhật Nguyệt AI にガードレールを適用した例を [https://nhatnguyet.org/tro-ly-ai](https://nhatnguyet.org/tro-ly-ai) で確認できます。
+
 | リリース | タグ | 内容 | ライセンス |
 | --- | --- | --- | --- |
-| [Python SDK 1.0.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.0.1) | `python/v1.0.1` | Python パッケージ：3 つのチェック、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
-| [Go SDK 1.0.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.0.1) | `go/v1.0.1` | Python パッケージの Go 移植版。同じポリシーを読み、同じ判定を返す | CC BY-NC 4.0 |
-| [Python：ベトナム準拠ポリシー v1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.1) | `python-vietnam-compliance-v1.1` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
-| [Go：ベトナム準拠ポリシー v1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.1) | `go-vietnam-compliance-v1.1` | 同じポリシーと定型応答の Go 版（モジュールバージョン `v1.1.1`） | CC BY-NC 4.0 |
+| [Python SDK 1.1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.1) | `python/v1.1.1` | Python と TypeScript のパッケージ：3 つのチェック、マルチターンの帰属、リアルタイムのレビュー、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.1) | `go/v1.2.1` | 同じエンジンの Go 版。実測・再判定・回帰テストのツール付き | CC BY-NC 4.0 |
+| [Python：ベトナム準拠ポリシー v1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2) | `python-vietnam-compliance-v1.2` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
+| [Go：ベトナム準拠ポリシー v1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2) | `go-vietnam-compliance-v1.2` | 同じポリシーの Go 版（モジュールバージョン `v1.3.0`） | CC BY-NC 4.0 |
 
 各リリースノートに内容とインストール方法を記載しています。上の表と同じ順に：
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.0.1#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.0.1
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.1#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.1.1
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.1#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.1
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.0
 ```
 
-Go 版とベトナム版はそれぞれ専用ブランチ（`go-sdk`、`guardrail-vietnam-compliance`、
-`go-vietnam-compliance`）からビルドされており、まだ `main` にはマージされていません。以前のリリース
-`python/v1.0.0`, `go/v1.0.0`, `go/v1.1.0`, `python-vietnam-compliance-v1`, `go-vietnam-compliance-v1` はこれらに置き換えられています。[すべてのリリース](https://github.com/taman-spirit/guardrail-chatbot-jev/releases)。
+Python と TypeScript は `main`、Go は `go-sdk`、ベトナムポリシーは `guardrail-vietnam-compliance`（Python）と
+`go-vietnam-compliance`（Go）にあります。以前のリリースはこれらに置き換えられました。[すべてのリリース](https://github.com/taman-spirit/guardrail-chatbot-jev/releases)。
 
 ## ベトナムにおける AI 規制への準拠
 

@@ -48,6 +48,8 @@ class SentinelCorroboration:
     refusal_except: frozenset[str]
     weak_at_most_flag: bool
     redact_instead_of_block_below: float
+    #: Categories never weakened: an uncorroborated sentinel keeps never_below and is not capped.
+    weak_except: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,6 +184,7 @@ class Policy:
             refusal_except=frozenset(raw.get("refusal_except") or ()),
             weak_at_most_flag=bool(raw.get("weak_at_most_flag", False)),
             redact_instead_of_block_below=float(raw.get("redact_instead_of_block_below", 0) or 0),
+            weak_except=frozenset(raw.get("weak_except") or ()),
         )
 
     def confidence_gate(self) -> ConfidenceGateOptions:

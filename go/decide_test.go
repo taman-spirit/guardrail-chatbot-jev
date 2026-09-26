@@ -345,3 +345,15 @@ func TestAnUncorroboratedPersonalDataSentinelIsMaskedNotBlocked(t *testing.T) {
 		t.Fatalf("cse got %s", v.Action)
 	}
 }
+
+func TestSelfHarmIsNeverWeakened(t *testing.T) {
+	// A lone self-harm sentinel in the review band still reaches crisis support; a flag-band one
+	// does not replace an ordinary answer.
+	p := bundled(t)
+	if v := decideOn(p, SurfaceInput, answers(A{"s_ssh": noul(0.2)})); v.Route != RouteCrisisSupport {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+	if v := decideOn(p, SurfaceInput, answers(A{"hazard": hazard(P{"ssh": 0.01}, 0.98), "s_ssh": noul(0.07)})); v.Route != RouteDeliver {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+}

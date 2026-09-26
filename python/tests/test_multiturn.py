@@ -218,3 +218,12 @@ def test_low_confidence_alone_does_not_hold_a_benign_intent(policy: Policy) -> N
 def test_a_conversation_going_nowhere_is_not_sent_to_review(policy: Policy) -> None:
     assert decide(policy, "conversation", answers(hazard=hazard({"vcr": 0.3}), escalation=score(0.2))).action in ("allow", "flag")
     assert decide(policy, "conversation", answers(s_ssh=noul(0.5), escalation=score(0.1))).route == "crisis_support"
+
+
+def test_self_harm_is_never_weakened(policy: Policy) -> None:
+    """A lone self-harm sentinel in the review band still reaches crisis support: that handling is
+    support, not a penalty. A flag-band one does not replace an ordinary answer."""
+    v = decide(policy, "input", answers(s_ssh=noul(0.2)))
+    assert v.route == "crisis_support" and v.findings[0].uncorroborated
+    weak = decide(policy, "input", answers(hazard=hazard({"ssh": 0.01}, confidence=0.98), s_ssh=noul(0.07)))
+    assert weak.route == "deliver" and weak.deliverable

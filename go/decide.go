@@ -41,7 +41,8 @@ func Decide(p *Policy, surface Surface, answers Answers, opts DecideOptions) Ver
 		}
 		uncorroborated := checkCorroboration && sentinelSourced[cat.ID] &&
 			floatOr(choice[cat.ID], 0) < corroboration.MinChoice
-		if f, fired := finding(cat, surface, probabilities[cat.ID], confidence, sentinelSourced[cat.ID], uncorroborated); fired {
+		neverWeak := checkCorroboration && corroboration.WeakExcept[cat.ID]
+		if f, fired := finding(cat, surface, probabilities[cat.ID], confidence, sentinelSourced[cat.ID], uncorroborated, neverWeak); fired {
 			findings = append(findings, f)
 		}
 	}
@@ -243,7 +244,7 @@ func hazardProbabilities(p *Policy, surface Surface, answers Answers) (map[strin
 	return probabilities, confidences, sentinelSourced
 }
 
-func finding(cat *Category, surface Surface, probability, confidence float64, sentinel, uncorroborated bool) (Finding, bool) {
+func finding(cat *Category, surface Surface, probability, confidence float64, sentinel, uncorroborated, neverWeak bool) (Finding, bool) {
 	bands, ok := cat.Threshold(surface)
 	if !ok {
 		return Finding{}, false
@@ -267,7 +268,7 @@ func finding(cat *Category, surface Surface, probability, confidence float64, se
 	// A sentinel alone, which the hazard choice does not back, answers at its own band: it may
 	// still reach block by crossing the block band, but never_below does not lift it there.
 	switch {
-	case cat.NeverBelow != "" && uncorroborated && probability < bands.Block:
+	case cat.NeverBelow != "" && uncorroborated && probability < bands.Block && !neverWeak:
 		notes = append(notes, fmt.Sprintf("uncorroborated sentinel: never below %s not applied", cat.NeverBelow))
 	case cat.NeverBelow != "":
 		action = Stronger(action, cat.NeverBelow)
@@ -288,7 +289,7 @@ func finding(cat *Category, surface Surface, probability, confidence float64, se
 		Source:         source,
 		Notes:          notes,
 		Uncorroborated: uncorroborated,
-		weak:           uncorroborated && probability < bands.Block,
+		weak:           uncorroborated && probability < bands.Block && !neverWeak,
 	}, true
 }
 

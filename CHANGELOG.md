@@ -3,6 +3,14 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Go 1.2.1, Python 1.1.1] - 2026-09-26
+
+### Fixed
+
+- Go, Python and TypeScript: a lone self-harm sentinel in the review band is no longer weakened to flag, so it still reaches
+  the crisis response: `sentinel_corroboration.weak_except` keeps `ssh` whole. A flag-band one
+  still does not replace an ordinary answer.
+
 ## [Go 1.2.0, Python 1.1.0] - 2026-09-26
 
 ### Changed

@@ -277,6 +277,9 @@ type SentinelCorroboration struct {
 	// RedactInsteadOfBlockBelow resolves an uncorroborated sentinel for a category handled by
 	// redaction to review, so it is masked and delivered, unless it reaches this value. Zero is off.
 	RedactInsteadOfBlockBelow float64
+	// WeakExcept are categories never weakened: an uncorroborated sentinel for them keeps
+	// never_below and is not capped. Self-harm is one: its crisis handling is support, not a penalty.
+	WeakExcept map[string]bool
 }
 
 // ConfidenceGateOptions narrow when a low-confidence answer escalates to review.
@@ -319,6 +322,10 @@ func (p *Policy) SentinelCorroboration() (SentinelCorroboration, bool) {
 	}
 	for _, id := range stringsOf(raw["refusal_except"]) {
 		c.RefusalExcept[id] = true
+	}
+	c.WeakExcept = map[string]bool{}
+	for _, id := range stringsOf(raw["weak_except"]) {
+		c.WeakExcept[id] = true
 	}
 	return c, true
 }
