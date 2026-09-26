@@ -43,18 +43,18 @@ paquets n'a de dépendance tierce.
 
 | Version | Tag | Contenu | Licence |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.1) | `python/v1.1.1` | Le paquet Python et TypeScript : trois vérifications, attribution multi-tours, revue en temps réel, cache, préfiltre, sessions, streaming, réglage hors ligne et CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.1) | `go/v1.2.1` | Le même moteur en Go, avec les outils de test en direct, de rejeu et de régression | CC BY-NC 4.0 |
-| [Python : politique de conformité Viet Nam v1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2) | `python-vietnam-compliance-v1.2` | La politique `vietnam-compliance-v1`, avec des réponses prérédigées en vietnamien, anglais et chinois | CC BY-NC 4.0 |
-| [Go : politique de conformité Viet Nam v1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2) | `go-vietnam-compliance-v1.2` | La même politique en Go, version de module `v1.3.0` | CC BY-NC 4.0 |
+| [Python SDK 1.1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.2) | `python/v1.1.2` | Le paquet Python et TypeScript : trois vérifications, attribution multi-tours, revue en temps réel, cache, préfiltre, sessions, streaming, réglage hors ligne et CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.2) | `go/v1.2.2` | Le même moteur en Go, avec les outils de test en direct, de rejeu et de régression | CC BY-NC 4.0 |
+| [Python : politique de conformité Viet Nam v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.1) | `python-vietnam-compliance-v1.2.1` | La politique `vietnam-compliance-v1`, avec des réponses prérédigées en vietnamien, anglais et chinois | CC BY-NC 4.0 |
+| [Go : politique de conformité Viet Nam v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.1) | `go-vietnam-compliance-v1.2.1` | La même politique en Go, version de module `v1.3.1` | CC BY-NC 4.0 |
 
 Chaque note de version indique ce qu'elle contient et comment l'installer. Dans le même ordre :
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.1#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.1
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.0
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.2#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.2
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.1#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.1
 ```
 
 Python et TypeScript sont sur `main` ; Go sur `go-sdk` ; la politique Viet Nam sur
@@ -312,9 +312,69 @@ mémorisée, son texte n'est jamais relu, et le modèle ne le voit pas.
 
 ### Définitions
 
-```
+#### Réglages en vigueur
 
-Code : `V_in` [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119), `V_out` [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131), `W_t` [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L75), `V_ctx`, `c`, `d` [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333) / [`context_questions`](python/src/guardrail_chatbot_jev/questions.py#L135), `A_t`, `⊕` [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350), `risk` [`Session.observe`](python/src/guardrail_chatbot_jev/session.py#L93), `carry` [`Session.advance`](python/src/guardrail_chatbot_jev/session.py#L110)
+| Réglage | Valeur | Signification |
+| --- | --- | --- |
+| Fenêtre d'historique | 10 messages | La vérification de conversation et la lecture en contexte voient les dix derniers messages. |
+| Risque par verdict | allow 0 · flag 0,25 · review 0,6 · block 1,0 | Ce qu'un verdict ajoute au risque de la session. |
+| Décroissance | 0,5 | À chaque vérification, le risque précédent est divisé par deux ; la session garde le plus élevé des deux. |
+| Surveillance dès | risque ≥ 0,2 | Tant que le risque atteint 0,2, la réponse est aussi lue en contexte. |
+| Report | 2 tours | Après une revue de conversation ou un blocage, la session reste surveillée deux tours. |
+| Attribution | ≥ 0,5, et au-dessus du « recul » | La lecture en contexte ne compte que si Jev est sûr à 50 % au moins que la réponse complète une demande nuisible antérieure, et plus sûr de cela que du recul de l'utilisateur. |
+| Corroboration | ≥ 0,02 | Une sentinelle est corroborée quand la question principale donne au moins 2 % à sa catégorie. |
+| Sentinelle faible | sous sa bande block | Seule et sous la bande block, elle est enregistrée en flag et délivrée. |
+| Jamais affaiblies | `ssh` (pack Viet Nam : `ssh`, `vsv`, `vld`) | Ces catégories gardent toute leur force. |
+| Réponse de refus | refus ≥ 0,8, sentinelle < 0,5 | Plafonnée à flag, sauf `sid`, `prv`, `ipv` (pack Viet Nam : aussi `vsv`, `vld`). |
+| Masquer plutôt que bloquer | sentinelle < 0,8 | Une donnée personnelle signalée par la seule sentinelle est masquée et délivrée. |
+| Garde de confiance | confiance < 0,65 | En revue s'il y a un constat ou un quasi-constat, sauf intention jugée bénigne avec confiance ≥ 0,5. |
+| Plafond de conversation | escalation ≤ 0,5 | Plafonnée à flag, sauf `cse` et `ssh`. |
+| Jev injoignable | entrée : délivrer · sortie : retenir · conversation : délivrer | La sortie est le dernier rempart. |
+
+#### Seuils par catégorie
+
+| Catégorie | Nom | Flag / review / block | Sortie | Notes |
+| --- | --- | --- | --- | --- |
+| `cse` | Child sexual exploitation | 0.03 / 0.06 / 0.15 | = | sentinelle; jamais sous block |
+| `iwp` | Indiscriminate weapons (CBRNE) | 0.04 / 0.08 / 0.2 | = | sentinelle |
+| `ssh` | Suicide and self-harm | 0.07 / 0.15 / 0.3 | = | sentinelle; traité par crisis_support |
+| `vcr` | Violent crimes | 0.12 / 0.25 / 0.45 | = | sentinelle |
+| `src` | Sex-related crimes | 0.12 / 0.25 / 0.45 | = |  |
+| `hte` | Hate and discrimination | 0.15 / 0.28 / 0.5 | 0.08 / 0.18 / 0.35 |  |
+| `ncr` | Non-violent crimes | 0.15 / 0.3 / 0.5 | = |  |
+| `sxc` | Adult sexual content | 0.2 / 0.4 / 0.6 | = |  |
+| `prv` | Privacy and personal data | 0.2 / 0.4 / 0.7 | 0.15 / 0.28 / 0.5 | sentinelle; traité par redact |
+| `ipv` | Intellectual property | 0.25 / 0.45 / 0.7 | = | output, conversation seulement |
+| `dfm` | Defamation | 0.18 / 0.35 / 0.6 | = | output, conversation seulement |
+| `spc` | Specialized advice | 0.25 / 0.5 / 0.85 | = | traité par guide; output seulement |
+| `elc` | Elections and civic integrity | 0.15 / 0.3 / 0.5 | = |  |
+| `pij` | Prompt injection and jailbreak | 0.15 / 0.3 / 0.55 | = | sentinelle; input, conversation seulement |
+| `sid` | Sensitive information disclosure | 0.08 / 0.18 / 0.35 | = | sentinelle; output, conversation seulement |
+| `exa` | Excessive agency | 0.15 / 0.3 / 0.5 | = | output, conversation seulement |
+| `mis` | Misinformation and unsupported claims | 0.25 / 0.45 / 0.8 | = | traité par guide; output seulement |
+| `scp` | Out of scope | 0.4 / 0.75 / 0.95 | = | désactivée |
+
+Le pack Viet Nam ([`vietnam-compliance-v1`](policies/vietnam-compliance-v1.json)) ajoute ces catégories ; les autres gardent les seuils ci-dessus.
+
+| Catégorie | Nom | Flag / review / block | Sortie | Notes |
+| --- | --- | --- | --- | --- |
+| `vsv` | Territorial sovereignty of Viet Nam | 0.15 / 0.3 / 0.5 | 0.1 / 0.22 / 0.4 | sentinelle |
+| `vas` | Propaganda against the State | 0.15 / 0.3 / 0.55 | = |  |
+| `vld` | Insulting national leaders and symbols | 0.14 / 0.28 / 0.5 | 0.1 / 0.2 / 0.4 | sentinelle |
+| `vcs` | False information and public disorder | 0.16 / 0.32 / 0.55 | = |  |
+| `vai` | Deceptive or manipulative use of AI | 0.15 / 0.3 / 0.55 | = |  |
+
+#### Les règles, en clair
+
+1. Chaque message et chaque réponse sont notés seuls ; le verdict est la bande la plus forte atteinte.
+2. La session retient le risque, pas le texte : le plus élevé entre la moitié du risque précédent et le risque du nouveau verdict.
+3. Une session est surveillée si son risque atteint 0,2, pendant deux tours après un constat grave, et tant qu'un message retenu reste dans la fenêtre.
+4. En session surveillée, la réponse est relue avec l'historique ; cette lecture ne compte que si elle complète une demande nuisible antérieure.
+5. L'historique seul ne relève jamais un verdict.
+
+#### Formules
+
+```
 V_in(t)   = D(input,  J(q_t))
 V_out(t)  = D(output, J(r_t))
 
@@ -328,9 +388,25 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-Code : `u_k` [`decide`](python/src/guardrail_chatbot_jev/decide.py#L57), `never_below` [`_finding`](python/src/guardrail_chatbot_jev/decide.py#L212), weak [`decide`](python/src/guardrail_chatbot_jev/decide.py#L70), refusal [`_cap_uncorroborated_on_refusal`](python/src/guardrail_chatbot_jev/decide.py#L241), redact [`_redact_instead_of_block`](python/src/guardrail_chatbot_jev/decide.py#L266), gate [`_confidence_gate`](python/src/guardrail_chatbot_jev/decide.py#L374), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
+Code : `V_in` [`check_input`](python/src/guardrail_chatbot_jev/guard.py#L119), `V_out` [`check_output`](python/src/guardrail_chatbot_jev/guard.py#L131), `W_t` [`Session.watching`](python/src/guardrail_chatbot_jev/session.py#L75), `V_ctx`, `c`, `d` [`_check_in_context`](python/src/guardrail_chatbot_jev/guard.py#L333) / [`context_questions`](python/src/guardrail_chatbot_jev/questions.py#L135), `A_t`, `⊕` [`_attribute`](python/src/guardrail_chatbot_jev/guard.py#L350), `risk` [`Session.observe`](python/src/guardrail_chatbot_jev/session.py#L93), `carry` [`Session.advance`](python/src/guardrail_chatbot_jev/session.py#L110)
 
 ### Calibrage mono-tour
+
+En clair :
+
+1. **Une sentinelle seule est un signal faible.** Quand seule la question oui/non dédiée voit une
+   catégorie, et que la question principale lui donne moins de 2 %, la détection est *non corroborée*.
+2. **Une détection faible reste à flag**, sauf si elle atteint seule le seuil de blocage ; le plancher
+   « jamais sous » de la catégorie ne la relève pas. L'automutilation n'est jamais affaiblie (pack
+   Viet Nam : aussi `vsv`, `vld`).
+3. **Une réponse qui refuse** (refus ≥ 0,8) avec une sentinelle faible sous 0,5 est notée à flag. Les
+   fuites de secrets, de données personnelles et de textes protégés (`sid`, `prv`, `ipv`) font exception,
+   car un refus peut encore les contenir.
+4. **Les données personnelles vues par la seule sentinelle** sont masquées puis livrées, pas bloquées,
+   sauf si la sentinelle atteint 0,8.
+5. **Une confiance faible** (sous 0,65) envoie une détection ou un quasi-seuil en revue, sauf si Jev lit
+   une intention bénigne avec une confiance d'au moins 0,5.
+6. **Une conversation qui ne s'aggrave pas** (escalade ≤ 0,5) est plafonnée à flag, sauf `cse` et `ssh`.
 
 ```
 u_k                 = finding from the sentinel only  ∧  choice_k < 0.02      (uncorroborated)
@@ -341,6 +417,8 @@ u_k ∧ route_k = redact ∧ action = block ∧ p < 0.8                    → r
 confidence gate:  conf < 0.65 ∧ (finding ∨ p ≥ θ_flag / 2) → review,  unless intent = benign ∧ conf ≥ 0.5
 conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
 ```
+
+Code : `u_k` [`decide`](python/src/guardrail_chatbot_jev/decide.py#L57), `never_below` [`_finding`](python/src/guardrail_chatbot_jev/decide.py#L212), weak [`decide`](python/src/guardrail_chatbot_jev/decide.py#L70), refusal [`_cap_uncorroborated_on_refusal`](python/src/guardrail_chatbot_jev/decide.py#L241), redact [`_redact_instead_of_block`](python/src/guardrail_chatbot_jev/decide.py#L266), gate [`_confidence_gate`](python/src/guardrail_chatbot_jev/decide.py#L374), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
 
 ### Revue en temps réel
 
