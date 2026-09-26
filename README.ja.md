@@ -40,18 +40,18 @@
 
 | リリース | タグ | 内容 | ライセンス |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.1) | `python/v1.1.1` | Python と TypeScript のパッケージ：3 つのチェック、マルチターンの帰属、リアルタイムのレビュー、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.1) | `go/v1.2.1` | 同じエンジンの Go 版。実測・再判定・回帰テストのツール付き | CC BY-NC 4.0 |
-| [Python：ベトナム準拠ポリシー v1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2) | `python-vietnam-compliance-v1.2` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
-| [Go：ベトナム準拠ポリシー v1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2) | `go-vietnam-compliance-v1.2` | 同じポリシーの Go 版（モジュールバージョン `v1.3.0`） | CC BY-NC 4.0 |
+| [Python SDK 1.1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.2) | `python/v1.1.2` | Python と TypeScript のパッケージ：3 つのチェック、マルチターンの帰属、リアルタイムのレビュー、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.2) | `go/v1.2.2` | 同じエンジンの Go 版。実測・再判定・回帰テストのツール付き | CC BY-NC 4.0 |
+| [Python：ベトナム準拠ポリシー v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.1) | `python-vietnam-compliance-v1.2.1` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
+| [Go：ベトナム準拠ポリシー v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.1) | `go-vietnam-compliance-v1.2.1` | 同じポリシーの Go 版（モジュールバージョン `v1.3.1`） | CC BY-NC 4.0 |
 
 各リリースノートに内容とインストール方法を記載しています。上の表と同じ順に：
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.1#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.1
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.0
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.2#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.2
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.1#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.1
 ```
 
 Python と TypeScript は `main`、Go は `go-sdk`、ベトナムポリシーは `guardrail-vietnam-compliance`（Python）と
@@ -293,9 +293,59 @@ finding）。
 
 ### 定義
 
-```
+#### 現在の設定
 
-コード：`V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
+| 設定 | 値 | 意味 |
+| --- | --- | --- |
+| 履歴ウィンドウ | 10 メッセージ | 会話チェックと文脈付きの読みは直近 10 メッセージを見る。 |
+| 判定ごとのリスク | allow 0 · flag 0.25 · review 0.6 · block 1.0 | 判定がセッションのリスクに加える量。 |
+| 減衰 | 0.5 | チェックごとに前のリスクは半分になり、新しい判定のリスクとの大きい方を保つ。 |
+| 監視開始 | リスク ≥ 0.2 | この間、応答を文脈付きでも読む。 |
+| 監視の持ち越し | 2 ターン | 会話レベルの review 以上、または block の後、2 ターン監視を続ける。 |
+| 帰属 | ≥ 0.5、かつ「距離を置く」より高い | 応答が以前の有害な依頼を完成させる確率が 0.5 以上で、ユーザーが距離を置いている確率より高いときだけ効く。 |
+| 裏付け | ≥ 0.02 | 主の質問がそのカテゴリに 2 % 以上を与えれば、センチネルは裏付けあり。 |
+| 弱いセンチネル | block 帯未満 | 単独で block 帯未満なら flag として記録し、配信する。 |
+| 弱めないカテゴリ | `ssh`（ベトナムパック：`ssh`、`vsv`、`vld`） | センチネルだけでも強さを保つ。 |
+| 拒否の応答 | refusal ≥ 0.8、センチネル < 0.5 | flag まで下げる（`sid`、`prv`、`ipv` を除く。ベトナムパックは `vsv`、`vld` も）。 |
+| 遮蔽して配信 | センチネル < 0.8 | センチネルだけが示す個人情報は、ブロックせず遮蔽して配信。 |
+| 信頼度ゲート | 信頼度 < 0.65 | 所見やニアミスがあれば review。ただし意図が benign で信頼度 ≥ 0.5 なら除く。 |
+| 会話の上限 | escalation ≤ 0.5 | flag まで（`cse`、`ssh` を除く）。 |
+| Jev に接続できない | 入力：配信 · 出力：保留 · 会話：配信 | 出力チェックが最後の砦。 |
+
+#### カテゴリ別のしきい値
+
+| カテゴリ | 名前 | Flag / review / block | 出力 | 備考 |
+| --- | --- | --- | --- | --- |
+| `cse` | Child sexual exploitation | 0.03 / 0.06 / 0.15 | = | センチネル; block 未満にしない |
+| `iwp` | Indiscriminate weapons (CBRNE) | 0.04 / 0.08 / 0.2 | = | センチネル |
+| `ssh` | Suicide and self-harm | 0.07 / 0.15 / 0.3 | = | センチネル; crisis_support で処理 |
+| `vcr` | Violent crimes | 0.12 / 0.25 / 0.45 | = | センチネル |
+| `src` | Sex-related crimes | 0.12 / 0.25 / 0.45 | = |  |
+| `hte` | Hate and discrimination | 0.15 / 0.28 / 0.5 | 0.08 / 0.18 / 0.35 |  |
+| `ncr` | Non-violent crimes | 0.15 / 0.3 / 0.5 | = |  |
+| `sxc` | Adult sexual content | 0.2 / 0.4 / 0.6 | = |  |
+| `prv` | Privacy and personal data | 0.2 / 0.4 / 0.7 | 0.15 / 0.28 / 0.5 | センチネル; redact で処理 |
+| `ipv` | Intellectual property | 0.25 / 0.45 / 0.7 | = | output, conversation のみ |
+| `dfm` | Defamation | 0.18 / 0.35 / 0.6 | = | output, conversation のみ |
+| `spc` | Specialized advice | 0.25 / 0.5 / 0.85 | = | guide で処理; output のみ |
+| `elc` | Elections and civic integrity | 0.15 / 0.3 / 0.5 | = |  |
+| `pij` | Prompt injection and jailbreak | 0.15 / 0.3 / 0.55 | = | センチネル; input, conversation のみ |
+| `sid` | Sensitive information disclosure | 0.08 / 0.18 / 0.35 | = | センチネル; output, conversation のみ |
+| `exa` | Excessive agency | 0.15 / 0.3 / 0.5 | = | output, conversation のみ |
+| `mis` | Misinformation and unsupported claims | 0.25 / 0.45 / 0.8 | = | guide で処理; output のみ |
+| `scp` | Out of scope | 0.4 / 0.75 / 0.95 | = | 無効 |
+
+#### 規則の説明
+
+1. メッセージと応答はそれぞれ単独で採点し、判定は到達した最も強い帯。
+2. セッションは本文ではなくリスクを覚える：前のリスクの半分と新しい判定のリスクの大きい方。
+3. リスク 0.2 以上、重大な所見の後 2 ターン、保留メッセージがウィンドウ内にある間は監視する。
+4. 監視中は応答を履歴と一緒にもう一度読み、以前の有害な依頼を完成させる場合だけ効かせる。
+5. 履歴だけで判定が上がることはない。
+
+#### 数式
+
+```
 V_in(t)   = D(input,  J(q_t))
 V_out(t)  = D(output, J(r_t))
 
@@ -309,9 +359,22 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-コード：`u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
+コード：`V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
 
 ### 単一ターンの較正
+
+説明：
+
+1. **センチネル単独は弱い信号。** 専用の yes/no 質問だけがカテゴリを検出し、主なハザード質問がその
+   カテゴリに 2 % 未満しか与えない場合、その所見は「裏付けなし」とする。
+2. **弱い所見は flag まで。** 単独で block 帯に達した場合を除く。カテゴリの「never below」でも引き上げ
+   ない。自傷は弱めない（ベトナムパックは `vsv`、`vld` も）。
+3. **拒否する応答**（refusal ≥ 0.8）に 0.5 未満の弱いセンチネルが付いた場合は flag として記録する。
+   秘密・個人データ・保護されたテキストの漏えい（`sid`、`prv`、`ipv`）は例外。拒否文にも含まれうるため。
+4. **センチネルだけが見つけた個人データ**はブロックせずマスクして届ける。センチネルが 0.8 に達した場合を除く。
+5. **信頼度が低い**（0.65 未満）所見やニアミスはレビューへ。ただし Jev が意図を良性と 0.5 以上の信頼度で
+   判断した場合は除く。
+6. **エスカレートしない会話**（escalation ≤ 0.5）は flag まで。`cse` と `ssh` を除く。
 
 ```
 u_k                 = finding from the sentinel only  ∧  choice_k < 0.02      (uncorroborated)
@@ -322,6 +385,8 @@ u_k ∧ route_k = redact ∧ action = block ∧ p < 0.8                    → r
 confidence gate:  conf < 0.65 ∧ (finding ∨ p ≥ θ_flag / 2) → review,  unless intent = benign ∧ conf ≥ 0.5
 conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
 ```
+
+コード：`u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
 
 ### リアルタイムでのレビュー
 

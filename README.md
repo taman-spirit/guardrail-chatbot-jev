@@ -42,18 +42,18 @@ stack cannot drift apart. Neither package has a third-party dependency.
 
 | Release | Tag | What it is | Licence |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.1) | `python/v1.1.1` | The Python and TypeScript package: three checks, multi-turn attribution, realtime review, cache, prefilter, sessions, streaming, offline tuning and the CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.1) | `go/v1.2.1` | The same engine in Go, with the live, replay and regression test tools | CC BY-NC 4.0 |
-| [Python: Viet Nam compliance policy v1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2) | `python-vietnam-compliance-v1.2` | The `vietnam-compliance-v1` policy, with prewritten replies in Vietnamese, English and Chinese | CC BY-NC 4.0 |
-| [Go: Viet Nam compliance policy v1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2) | `go-vietnam-compliance-v1.2` | The same policy and replies in Go, as module version `v1.3.0` | CC BY-NC 4.0 |
+| [Python SDK 1.1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.2) | `python/v1.1.2` | The Python and TypeScript package: three checks, multi-turn attribution, realtime review, cache, prefilter, sessions, streaming, offline tuning and the CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.2) | `go/v1.2.2` | The same engine in Go, with the live, replay and regression test tools | CC BY-NC 4.0 |
+| [Python: Viet Nam compliance policy v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.1) | `python-vietnam-compliance-v1.2.1` | The `vietnam-compliance-v1` policy, with prewritten replies in Vietnamese, English and Chinese | CC BY-NC 4.0 |
+| [Go: Viet Nam compliance policy v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.1) | `go-vietnam-compliance-v1.2.1` | The same policy and replies in Go, as module version `v1.3.1` | CC BY-NC 4.0 |
 
 Each release note lists what the release contains and how to install it. In the same order:
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.1#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.1
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.0
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.2#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.2
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.1#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.1
 ```
 
 Python and TypeScript live on `main`; Go on `go-sdk`; the Viet Nam policy on
@@ -319,12 +319,74 @@ finishes an earlier harmful request" and "the user is stepping away".
 
 ### Definitions
 
+#### Settings in use
+
+| Setting | Value | What it means |
+| --- | --- | --- |
+| Transcript window | 10 messages | The conversation check and the in-context read see the last ten messages, about five exchanges. |
+| Risk per verdict | allow 0 · flag 0.25 · review 0.6 · block 1.0 | How much a verdict adds to the session's risk. |
+| Risk decay | 0.5 | Each check keeps half of the previous risk; the session keeps the higher of that and the new verdict's risk. |
+| Watched from | risk ≥ 0.2 | While the risk is at least 0.2, a reply is also read in context. |
+| Watch carry | 2 turns | After a conversation-level review or any block, the session stays watched for the next two completed turns. |
+| Attribution | ≥ 0.5, and more than "stepping away" | The in-context read counts only if Jev is at least 50 % sure the reply completes an earlier harmful request, and surer of that than that the user is stepping away. |
+| Corroboration | ≥ 0.02 | A sentinel counts as backed when the main hazard question gives its category at least 2 %. |
+| Weak sentinel | below its block band | A sentinel on its own, below the block band, is recorded at flag and delivered; "never below" does not lift it. |
+| Never weakened | `ssh` (Viet Nam pack: `ssh`, `vsv`, `vld`) | These keep full strength even when only the sentinel fires. |
+| Declining reply | refusal ≥ 0.8, sentinel < 0.5 | A refusal with a sentinel on its own is capped at flag, except `sid`, `prv`, `ipv` (Viet Nam pack: also `vsv`, `vld`). |
+| Mask instead of block | sentinel < 0.8 | Personal data raised by the sentinel alone is masked and delivered, not blocked. |
+| Confidence gate | confidence < 0.65 | A low-confidence answer with a finding or a near miss goes to review, unless Jev reads the intent as benign with confidence ≥ 0.5. |
+| Near miss | ≥ half the flag threshold | A probability close enough to a band to count for the confidence gate. |
+| Conversation cap | escalation ≤ 0.5 | A conversation not moving toward a harmful objective is capped at flag, except `cse` and `ssh`. |
+| Jev unreachable | input: deliver · output: hold · conversation: deliver | The input check sits in front of a model with its own safety; the output check is the last line. |
+
+#### Category thresholds
+
+A category fires at **flag**, **review** or **block** when its probability reaches that value. "Output"
+lists the bands that replace the defaults on assistant replies; "=" means the same.
+
+| Category | Name | Flag / review / block | Output | Notes |
+| --- | --- | --- | --- | --- |
+| `cse` | Child sexual exploitation | 0.03 / 0.06 / 0.15 | = | sentinel; never below block |
+| `iwp` | Indiscriminate weapons (CBRNE) | 0.04 / 0.08 / 0.2 | = | sentinel |
+| `ssh` | Suicide and self-harm | 0.07 / 0.15 / 0.3 | = | sentinel; handled by crisis_support |
+| `vcr` | Violent crimes | 0.12 / 0.25 / 0.45 | = | sentinel |
+| `src` | Sex-related crimes | 0.12 / 0.25 / 0.45 | = |  |
+| `hte` | Hate and discrimination | 0.15 / 0.28 / 0.5 | 0.08 / 0.18 / 0.35 |  |
+| `ncr` | Non-violent crimes | 0.15 / 0.3 / 0.5 | = |  |
+| `sxc` | Adult sexual content | 0.2 / 0.4 / 0.6 | = |  |
+| `prv` | Privacy and personal data | 0.2 / 0.4 / 0.7 | 0.15 / 0.28 / 0.5 | sentinel; handled by redact |
+| `ipv` | Intellectual property | 0.25 / 0.45 / 0.7 | = | output, conversation only |
+| `dfm` | Defamation | 0.18 / 0.35 / 0.6 | = | output, conversation only |
+| `spc` | Specialized advice | 0.25 / 0.5 / 0.85 | = | handled by guide; output only |
+| `elc` | Elections and civic integrity | 0.15 / 0.3 / 0.5 | = |  |
+| `pij` | Prompt injection and jailbreak | 0.15 / 0.3 / 0.55 | = | sentinel; input, conversation only |
+| `sid` | Sensitive information disclosure | 0.08 / 0.18 / 0.35 | = | sentinel; output, conversation only |
+| `exa` | Excessive agency | 0.15 / 0.3 / 0.5 | = | output, conversation only |
+| `mis` | Misinformation and unsupported claims | 0.25 / 0.45 / 0.8 | = | handled by guide; output only |
+| `scp` | Out of scope | 0.4 / 0.75 / 0.95 | = | disabled |
+
+#### The rules, in words
+
+1. **Each message and each reply is scored alone.** Every category gets a probability; the verdict is
+   the strongest band any category reaches, after the rules in the policy adjust it.
+2. **The session remembers risk, not text.** After each check the risk becomes the higher of half the
+   previous risk and the risk of the new verdict.
+3. **A session is watched** while its risk is at least 0.2, for two turns after a serious finding, and
+   while a withheld message is still in the window.
+4. **In a watched session the reply is read a second time with the earlier turns.** That reading
+   counts only if the reply completes an earlier harmful request (probability ≥ 0.5, and above the
+   probability that the user is stepping away).
+5. **The final verdict** is the standalone one, strengthened by the in-context findings only when they
+   count.
+6. **The history never raises a verdict by itself:** without that second reading, only the message or
+   the reply decides.
+
+#### Formulas
+
 `q_t` user message, `r_t` reply, `H_t` transcript window (10 messages), `J(x)` Jev answers for state
 `x`, `D(s, a)` policy decision on surface `s`, `⊕` verdict merge (per category the stronger finding).
 
 ```
-
-Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
 V_in(t)   = D(input,  J(q_t))
 V_out(t)  = D(output, J(r_t))
 
@@ -338,9 +400,25 @@ risk_t+1  = max(δ · risk_t, ρ(action)),  δ = 0.5,  ρ = (0, 0.25, 0.6, 1.0) 
 carry     = 2 turns after a conversation verdict ≥ review or any block
 ```
 
-Code: `u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
+Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
 
 ### Single-turn calibration
+
+In words:
+
+1. **A sentinel on its own is weak.** When only the dedicated yes/no question sees a category, and the
+   main hazard question gives that category under 2 %, the finding is *uncorroborated*.
+2. **A weak finding stays at flag** unless it reaches the block band by itself; the category's
+   "never below" floor does not lift it. Self-harm is never weakened (Viet Nam pack: also `vsv`, `vld`).
+3. **A reply that declines** (refusal ≥ 0.8) with a weak sentinel under 0.5 is recorded at flag. Leaks
+   of secrets, personal data and protected text (`sid`, `prv`, `ipv`) are excepted, because a refusal
+   can still contain them.
+4. **Personal data seen only by the sentinel** is masked and delivered rather than blocked, unless the
+   sentinel reaches 0.8.
+5. **Low confidence** (under 0.65) sends a finding or a near miss to review, unless Jev reads the intent
+   as benign with confidence of at least 0.5.
+6. **A conversation that is not escalating** (escalation ≤ 0.5) is capped at flag, except for `cse` and
+   `ssh`.
 
 Follow-ups are short and ambiguous; the following corrections target the single-turn errors they
 exposed. For category `k` with probability `p`, bands `θ_flag ≤ θ_review ≤ θ_block`, and `choice_k`
@@ -355,6 +433,8 @@ u_k ∧ route_k = redact ∧ action = block ∧ p < 0.8                    → r
 confidence gate:  conf < 0.65 ∧ (finding ∨ p ≥ θ_flag / 2) → review,  unless intent = benign ∧ conf ≥ 0.5
 conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
 ```
+
+Code: `u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
 
 Also: `spc` is judged per reply only; `ncr` and `iwp` descriptions exclude victims and questions
 about the law.

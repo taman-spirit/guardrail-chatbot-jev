@@ -42,18 +42,18 @@ thứ ba nào.
 
 | Bản phát hành | Tag | Nội dung | Giấy phép |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.1) | `python/v1.1.1` | Gói Python và TypeScript: ba lượt kiểm tra, quy lỗi multi-turn, review realtime, cache, prefilter, session, streaming, hiệu chỉnh offline và CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.1) | `go/v1.2.1` | Cùng engine bằng Go, kèm công cụ test chạy thật, chấm lại và hồi quy | CC BY-NC 4.0 |
-| [Python: policy tuân thủ Việt Nam v1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2) | `python-vietnam-compliance-v1.2` | Policy `vietnam-compliance-v1`, kèm câu trả lời viết sẵn bằng tiếng Việt, tiếng Anh và tiếng Trung | CC BY-NC 4.0 |
-| [Go: policy tuân thủ Việt Nam v1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2) | `go-vietnam-compliance-v1.2` | Cùng policy và câu trả lời đó cho Go, phiên bản module `v1.3.0` | CC BY-NC 4.0 |
+| [Python SDK 1.1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.2) | `python/v1.1.2` | Gói Python và TypeScript: ba lượt kiểm tra, quy lỗi multi-turn, review realtime, cache, prefilter, session, streaming, hiệu chỉnh offline và CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.2) | `go/v1.2.2` | Cùng engine bằng Go, kèm công cụ test chạy thật, chấm lại và hồi quy | CC BY-NC 4.0 |
+| [Python: policy tuân thủ Việt Nam v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.1) | `python-vietnam-compliance-v1.2.1` | Policy `vietnam-compliance-v1`, kèm câu trả lời viết sẵn bằng tiếng Việt, tiếng Anh và tiếng Trung | CC BY-NC 4.0 |
+| [Go: policy tuân thủ Việt Nam v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.1) | `go-vietnam-compliance-v1.2.1` | Cùng policy và câu trả lời đó cho Go, phiên bản module `v1.3.1` | CC BY-NC 4.0 |
 
 Release note của từng bản ghi rõ nội dung và cách cài đặt. Theo đúng thứ tự trên:
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.1#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.1
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.0
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.2#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.2
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.1#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.1
 ```
 
 Python và TypeScript nằm ở `main`; Go ở `go-sdk`; policy Việt Nam ở `guardrail-vietnam-compliance`
@@ -314,13 +314,75 @@ Các số trong ngoặc là loại câu trả lời mà Jev đưa ra trong các 
 
 ### Định nghĩa
 
+#### Các thiết lập đang dùng
+
+| Thiết lập | Giá trị | Ý nghĩa |
+| --- | --- | --- |
+| Cửa sổ lịch sử | 10 tin nhắn | Kiểm tra hội thoại và lần đọc có ngữ cảnh thấy mười tin nhắn gần nhất, khoảng năm lượt hỏi–đáp. |
+| Rủi ro của mỗi verdict | allow 0 · flag 0,25 · review 0,6 · block 1,0 | Mức rủi ro mà một verdict cộng vào session. |
+| Độ giảm rủi ro | 0,5 | Sau mỗi lần kiểm tra, rủi ro cũ còn một nửa; session giữ giá trị lớn hơn giữa nửa đó và rủi ro của verdict mới. |
+| Bắt đầu theo dõi | rủi ro ≥ 0,2 | Khi rủi ro còn từ 0,2 trở lên, câu trả lời được đọc thêm có ngữ cảnh. |
+| Theo dõi tiếp | 2 lượt | Sau một verdict hội thoại ≥ review hoặc bất kỳ block nào, session được theo dõi thêm hai lượt hoàn tất. |
+| Quy lỗi | ≥ 0,5, và lớn hơn "lùi ra" | Lần đọc có ngữ cảnh chỉ được tính khi Jev chắc ít nhất 50 % là câu trả lời hoàn tất một yêu cầu có hại trước đó, và chắc điều đó hơn là người dùng đang lùi ra. |
+| Xác nhận sentinel | ≥ 0,02 | Sentinel được xem là có xác nhận khi câu hỏi phân loại chính cho nhóm đó ít nhất 2 %. |
+| Sentinel yếu | dưới mức block của nhóm | Sentinel đứng một mình, dưới mức block, chỉ được ghi ở mức flag và vẫn gửi đi; "không bao giờ dưới" không nâng nó lên. |
+| Không bao giờ hạ | `ssh` (policy Việt Nam: `ssh`, `vsv`, `vld`) | Các nhóm này giữ nguyên độ mạnh kể cả khi chỉ có sentinel. |
+| Câu trả lời từ chối | refusal ≥ 0,8, sentinel < 0,5 | Câu từ chối có sentinel đứng một mình bị hạ xuống flag, trừ `sid`, `prv`, `ipv` (policy Việt Nam: thêm `vsv`, `vld`). |
+| Che thay vì chặn | sentinel < 0,8 | Dữ liệu cá nhân chỉ do sentinel phát hiện thì được che rồi gửi, không chặn. |
+| Cổng độ tự tin | độ tự tin < 0,65 | Câu trả lời kém tự tin, có phát hiện hoặc suýt chạm ngưỡng, bị chuyển sang review, trừ khi Jev đánh giá ý định là vô hại với độ tự tin ≥ 0,5. |
+| Suýt chạm ngưỡng | ≥ một nửa ngưỡng flag | Xác suất đủ gần một mức để cổng độ tự tin tính tới. |
+| Giới hạn hội thoại | escalation ≤ 0,5 | Hội thoại không tiến về mục tiêu có hại thì tối đa flag, trừ `cse` và `ssh`. |
+| Jev không phản hồi | input: gửi · output: giữ · hội thoại: gửi | Kiểm tra input đứng trước một mô hình có an toàn riêng; kiểm tra output là chốt cuối. |
+
+#### Ngưỡng theo nhóm
+
+Một nhóm kích hoạt ở mức **flag**, **review** hoặc **block** khi xác suất đạt giá trị đó. Cột "Output" là
+ngưỡng thay thế cho câu trả lời của trợ lý; "=" nghĩa là giống ngưỡng mặc định.
+
+| Nhóm | Tên | Flag / review / block | Output | Ghi chú |
+| --- | --- | --- | --- | --- |
+| `cse` | Child sexual exploitation | 0.03 / 0.06 / 0.15 | = | sentinel; không bao giờ dưới block |
+| `iwp` | Indiscriminate weapons (CBRNE) | 0.04 / 0.08 / 0.2 | = | sentinel |
+| `ssh` | Suicide and self-harm | 0.07 / 0.15 / 0.3 | = | sentinel; xử lý bằng crisis_support |
+| `vcr` | Violent crimes | 0.12 / 0.25 / 0.45 | = | sentinel |
+| `src` | Sex-related crimes | 0.12 / 0.25 / 0.45 | = |  |
+| `hte` | Hate and discrimination | 0.15 / 0.28 / 0.5 | 0.08 / 0.18 / 0.35 |  |
+| `ncr` | Non-violent crimes | 0.15 / 0.3 / 0.5 | = |  |
+| `sxc` | Adult sexual content | 0.2 / 0.4 / 0.6 | = |  |
+| `prv` | Privacy and personal data | 0.2 / 0.4 / 0.7 | 0.15 / 0.28 / 0.5 | sentinel; xử lý bằng redact |
+| `ipv` | Intellectual property | 0.25 / 0.45 / 0.7 | = | chỉ output, conversation |
+| `dfm` | Defamation | 0.18 / 0.35 / 0.6 | = | chỉ output, conversation |
+| `spc` | Specialized advice | 0.25 / 0.5 / 0.85 | = | xử lý bằng guide; chỉ output |
+| `elc` | Elections and civic integrity | 0.15 / 0.3 / 0.5 | = |  |
+| `pij` | Prompt injection and jailbreak | 0.15 / 0.3 / 0.55 | = | sentinel; chỉ input, conversation |
+| `sid` | Sensitive information disclosure | 0.08 / 0.18 / 0.35 | = | sentinel; chỉ output, conversation |
+| `exa` | Excessive agency | 0.15 / 0.3 / 0.5 | = | chỉ output, conversation |
+| `mis` | Misinformation and unsupported claims | 0.25 / 0.45 / 0.8 | = | xử lý bằng guide; chỉ output |
+| `scp` | Out of scope | 0.4 / 0.75 / 0.95 | = | tắt |
+
+#### Các quy tắc, diễn giải
+
+1. **Mỗi tin nhắn và mỗi câu trả lời được chấm riêng.** Mỗi nhóm có một xác suất; verdict là mức mạnh
+   nhất mà một nhóm đạt tới, sau khi các quy tắc trong policy điều chỉnh.
+2. **Session nhớ rủi ro, không nhớ nội dung.** Sau mỗi lần kiểm tra, rủi ro bằng giá trị lớn hơn giữa
+   một nửa rủi ro cũ và rủi ro của verdict mới.
+3. **Session được theo dõi** khi rủi ro từ 0,2 trở lên, trong hai lượt sau một phát hiện nghiêm trọng,
+   và khi còn tin nhắn bị chặn trong cửa sổ.
+4. **Khi được theo dõi, câu trả lời được đọc lần hai cùng các lượt trước.** Lần đọc này chỉ được tính
+   khi câu trả lời hoàn tất một yêu cầu có hại trước đó (xác suất ≥ 0,5, và cao hơn xác suất người dùng
+   đang lùi ra).
+5. **Verdict cuối cùng** là verdict đọc riêng, chỉ được tăng thêm bởi kết quả đọc có ngữ cảnh khi kết
+   quả đó được tính.
+6. **Lịch sử tự nó không bao giờ nâng verdict:** không có lần đọc thứ hai, chỉ tin nhắn hoặc câu trả lời
+   quyết định.
+
+#### Công thức
+
 `q_t` tin nhắn người dùng, `r_t` câu trả lời, `H_t` cửa sổ lịch sử (10 tin nhắn), `J(x)` câu trả lời của
 Jev cho trạng thái `x`, `D(s, a)` quyết định theo policy trên bề mặt `s`, `⊕` phép gộp verdict (mỗi nhóm
 lấy phát hiện mạnh hơn).
 
 ```
-
-Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
 V_in(t)   = D(input,  J(q_t))
 V_out(t)  = D(output, J(r_t))
 
@@ -334,9 +396,23 @@ risk_t+1  = max(δ · risk_t, ρ(hành động)),  δ = 0.5,  ρ = (0, 0.25, 0.6
 carry     = 2 lượt sau một verdict hội thoại ≥ review hoặc bất kỳ block nào
 ```
 
-Code: `u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
+Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L253), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L74), `carry` [`Session.Advance`](go/session.go#L91)
 
 ### Hiệu chỉnh đơn lượt
+
+Diễn giải:
+
+1. **Sentinel đứng một mình là tín hiệu yếu.** Khi chỉ câu hỏi có/không riêng của một nhóm nhận ra nó,
+   còn câu hỏi phân loại chính cho nhóm đó dưới 2 %, phát hiện được xem là *chưa xác nhận*.
+2. **Phát hiện yếu chỉ ở mức flag**, trừ khi tự nó chạm mức block; ngưỡng "không bao giờ dưới" của nhóm
+   không nâng nó lên. Tự hại không bao giờ bị hạ (policy Việt Nam: thêm `vsv`, `vld`).
+3. **Câu trả lời từ chối** (refusal ≥ 0,8) kèm sentinel yếu dưới 0,5 chỉ được ghi ở mức flag. Rò rỉ bí
+   mật, dữ liệu cá nhân và nội dung được bảo hộ (`sid`, `prv`, `ipv`) là ngoại lệ, vì câu từ chối vẫn có
+   thể chứa chúng.
+4. **Dữ liệu cá nhân chỉ do sentinel phát hiện** được che rồi gửi, không chặn, trừ khi sentinel đạt 0,8.
+5. **Độ tự tin thấp** (dưới 0,65) đưa phát hiện hoặc trường hợp suýt chạm ngưỡng sang review, trừ khi
+   Jev đánh giá ý định là vô hại với độ tự tin từ 0,5 trở lên.
+6. **Hội thoại không leo thang** (escalation ≤ 0,5) tối đa ở mức flag, trừ `cse` và `ssh`.
 
 Câu theo sau thường ngắn và mơ hồ; các hiệu chỉnh dưới đây nhắm vào những lỗi đơn lượt mà chúng làm lộ
 ra. Với nhóm `k`, xác suất `p`, các ngưỡng `θ_flag ≤ θ_review ≤ θ_block`, và `choice_k` là xác suất mà
@@ -351,6 +427,8 @@ u_k ∧ route_k = redact ∧ hành động = block ∧ p < 0.8                 �
 cổng tự tin:  conf < 0.65 ∧ (có phát hiện ∨ p ≥ θ_flag / 2) → review,  trừ khi intent = benign ∧ conf ≥ 0.5
 hội thoại:    escalation ≤ 0.5 → tối đa flag,  trừ cse, ssh
 ```
+
+Code: `u_k` [`Decide`](go/decide.go#L42), `never_below` [`finding`](go/decide.go#L270), weak [`Decide`](go/decide.go#L66), refusal [`capUncorroboratedOnRefusal`](go/decide.go#L166), redact [`Decide`](go/decide.go#L53), gate [`confidenceGate`](go/decide.go#L415), conversation [`no-escalation-caps-conversation`](policies/standard-v1.json#L699), settings [`sentinel_corroboration`](policies/standard-v1.json#L23) / [`confidence_gate`](policies/standard-v1.json#L31), [`spc`](policies/standard-v1.json#L327), [`ncr`](policies/standard-v1.json#L208), [`iwp`](policies/standard-v1.json#L84)
 
 Ngoài ra: `spc` chỉ chấm ở từng câu trả lời; mô tả `ncr` và `iwp` loại trừ người bị hại và câu hỏi về
 pháp luật.
