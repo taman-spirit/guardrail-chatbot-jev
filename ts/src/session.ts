@@ -7,6 +7,7 @@
  * something, so a conversation that has been escalating is not read as if it had just begun.
  */
 
+import { WITHHELD_PLACEHOLDER } from "./multiturn.js";
 import { LADDER, type Action, type Turn, type Verdict, rank, stronger } from "./types.js";
 
 /** How much each action contributes to the session's risk score. */
@@ -83,6 +84,43 @@ export class Session {
     return [...this.turns];
   }
 
+  /**
+   * Append a turn given the verdict on it. A turn the guardrail withheld is kept as
+   * {@link WITHHELD_PLACEHOLDER}, so the attempt is remembered but its text is never read again.
+   */
+  record(role: Turn["role"], content: string, verdict: Pick<Verdict, "deliverable">): void {
+    this.addTurn(role, verdict.deliverable ? content : WITHHELD_PLACEHOLDER);
+  }
+
+  /**
+   * The transcript to send to the chat model: withheld turns are left out, so the model never
+   * sees a blocked request, not even as a placeholder it might try to answer.
+   */
+  modelHistory(): Turn[] {
+    return this.turns.filter((turn) => turn.content !== WITHHELD_PLACEHOLDER);
+  }
+
+  /**
+   * Whether replies should be read in context. Any of three keeps the watch on:
+   *
+   * - a conversation verdict of review or worse, or a block, in the last `carryTurns` completed
+   *   turns (counted by `advance`, the same counter the "floor" mode uses for its floor);
+   * - a risk that has not yet decayed below `threshold`;
+   * - a withheld turn still inside the transcript window.
+   *
+   * Watching never holds anything by itself. It only decides whether a reply is also read against
+   * the earlier turns, which is what costs a second request.
+   */
+  watching(threshold: number): boolean {
+    if (this.floorLeft > 0 || this.risk >= threshold) return true;
+    return this.turns.some((turn) => turn.content === WITHHELD_PLACEHOLDER);
+  }
+
+  /** How many more turns the current floor applies to. */
+  get floorTurnsLeft(): number {
+    return this.floorLeft;
+  }
+
   /** The minimum action the next check will resolve to. */
   get floor(): Action {
     return this.floorLeft > 0 ? this.floorAction : "allow";
@@ -115,12 +153,17 @@ export class Session {
     }
   }
 
-  /** Deployment context worth putting in front of Jev on later turns. */
+  /**
+   * Deployment context worth putting in front of Jev on later turns.
+   *
+   * The session's risk score is deliberately not in it. A score in front of Jev invites it to judge
+   * the current message by the conversation's past, which is the contamination the session exists
+   * to avoid; the risk is carried by the session itself.
+   */
   metadata(): Record<string, unknown> {
     return {
       conversation_id: this.id,
       turn_number: this.turns.length + 1,
-      session_risk: Number(this.risk.toFixed(3)),
     };
   }
 

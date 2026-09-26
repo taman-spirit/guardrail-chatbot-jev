@@ -429,6 +429,8 @@ REPLAY_DIRS='/tmp/mt*' go test -tags replay -run TestReplay -v ./     # offline
 
 ### Usage
 
+Go:
+
 ```go
 guard := guardrail.New(guardrail.Options{ReviewHandling: guardrail.ReviewAsAudit})
 session := guardrail.NewSession(conversationID)
@@ -442,6 +444,34 @@ reply := callModel(session.ModelHistory(), message)
 out, _ := guard.CheckOutput(ctx, reply, &guardrail.CheckOptions{Session: session, UserMessage: message})
 session.Record("assistant", reply, out)
 session.Advance()
+```
+
+Python:
+
+```python
+guard = Guard(review_handling="audit")
+session = Session(id=conversation_id)
+
+verdict_in = guard.check_input(message, session=session)
+session.record("user", message, verdict_in)
+reply = call_model(session.model_history(), message)
+verdict_out = guard.check_output(reply, user_message=message, session=session)
+session.record("assistant", reply, verdict_out)
+session.advance()
+```
+
+TypeScript:
+
+```typescript
+const guard = new Guard({ reviewHandling: "audit" });
+const session = new Session({ id: conversationId });
+
+const verdictIn = await guard.checkInput(message, { session });
+session.record("user", message, verdictIn);
+const reply = await callModel(session.modelHistory(), message);
+const verdictOut = await guard.checkOutput(reply, { userMessage: message, session });
+session.record("assistant", reply, verdictOut);
+session.advance();
 ```
 
 `out.Context` holds the in-context read (`completes`, `disengages`, `attributed`); `out.Audit` the

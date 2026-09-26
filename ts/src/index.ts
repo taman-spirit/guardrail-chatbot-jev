@@ -20,12 +20,33 @@ export type {
   Transport,
   TransportResult,
 } from "./client.js";
-export { decide, errorVerdict, withFloor } from "./decide.js";
+export { decide, errorVerdict, resolveRoute, sortFindings, withFloor } from "./decide.js";
 export type { DecideOptions } from "./decide.js";
 export { DEFAULT_CACHE_SURFACES, Guard } from "./guard.js";
-export type { CheckOptions, GuardConfig, OutputOptions } from "./guard.js";
+export type { CheckOptions, GuardConfig, OutputOptions, ReviewHandling } from "./guard.js";
+export {
+  attribute,
+  CONTEXT_COMPLETES,
+  CONTEXT_DISENGAGES,
+  CONTEXT_EVALUATING,
+  contextQuestions,
+  DEFAULT_ATTRIBUTION,
+  DEFAULT_WATCH_RISK,
+  outputInContextState,
+  WITHHELD_PLACEHOLDER,
+} from "./multiturn.js";
+export type { ContextCheck, ContextResult, MultiturnMode } from "./multiturn.js";
 export { Policy } from "./policy.js";
-export type { Category, CategorySpec, PolicyPack, RuleSpec, SignalSpec, Thresholds } from "./policy.js";
+export type {
+  Category,
+  CategorySpec,
+  ConfidenceGateOptions,
+  PolicyPack,
+  RuleSpec,
+  SentinelCorroboration,
+  SignalSpec,
+  Thresholds,
+} from "./policy.js";
 export { COMMON_PATTERNS, patternPrefilter, prefilterVerdict } from "./prefilter.js";
 export type { Pattern, Prefilter } from "./prefilter.js";
 export {
@@ -33,6 +54,7 @@ export {
   conversationState,
   HAZARD,
   inputState,
+  NONE_DESCRIPTION,
   NONE_LABEL,
   outputState,
   SENTINEL_PREFIX,
@@ -43,4 +65,16 @@ export type { SessionConfig, SessionState } from "./session.js";
 export { guardStream } from "./streaming.js";
 export type { StreamEvent, StreamEventType, StreamOptions } from "./streaming.js";
 export { GuardrailError, LADDER, rank, shift, stronger, weaker, WITHHOLDING } from "./types.js";
-export type { Action, Answer, Answers, Finding, Route, Surface, Turn, Usage, Verdict } from "./types.js";
+export type {
+  Action,
+  Answer,
+  Answers,
+  AuditLevel,
+  ContextRead,
+  Finding,
+  Route,
+  Surface,
+  Turn,
+  Usage,
+  Verdict,
+} from "./types.js";

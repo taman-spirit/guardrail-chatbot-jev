@@ -19,7 +19,9 @@ export type Route =
   | "guide"
   | "crisis_support"
   | "human_review"
-  | "safe_response";
+  | "safe_response"
+  /** Send the content now and queue it for a person to look at later; see `reviewHandling`. */
+  | "deliver_and_audit";
 
 /** Routes that withhold the content and put something else in its place. */
 export const WITHHOLDING: ReadonlySet<Route> = new Set<Route>([
@@ -57,6 +59,11 @@ export interface Finding {
   readonly refs: readonly string[];
   readonly source: string;
   readonly notes: readonly string[];
+  /**
+   * True for a finding raised by a sentinel alone while the hazard choice gave its category next
+   * to nothing; see the pack's `defaults.sentinel_corroboration`.
+   */
+  readonly uncorroborated: boolean;
 }
 
 export interface Usage {
@@ -90,6 +97,32 @@ export interface Verdict {
   readonly partial: boolean;
   /** Set when a prefilter decided without calling Jev. */
   readonly prefilter?: string;
+  readonly error?: string;
+  /** What the in-context output check found, when it ran. */
+  readonly context?: ContextRead;
+  /**
+   * Whether a person should look at this later: "priority" for review or worse, "sample" for a
+   * flag, null for nothing. It is independent of whether the content was delivered. Set by the
+   * guard; a verdict from `decide` alone does not carry it.
+   */
+  readonly audit?: AuditLevel | null;
+}
+
+export type AuditLevel = "priority" | "sample";
+
+/** What the in-context output check found, recorded on the verdict for audit. */
+export interface ContextRead {
+  /** False when the check did not run for this verdict. */
+  readonly ran: boolean;
+  /**
+   * True when the reply was found to complete an earlier harmful request, so the in-context
+   * findings count against it.
+   */
+  readonly attributed: boolean;
+  readonly completes: number;
+  readonly disengages: number;
+  /** Categories fired in context, whether or not they were attributed. */
+  readonly categories: readonly string[];
   readonly error?: string;
 }
 
