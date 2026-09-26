@@ -24,20 +24,26 @@ import (
 	"testing"
 )
 
+type liveTurn struct {
+	Role          string `json:"role"`
+	Content       string `json:"content"`
+	Ref           string `json:"ref"`
+	RefOutputUser string `json:"ref_output_user"`
+}
+
 type liveCase struct {
-	ID                  string `json:"id"`
-	Kind                string `json:"kind"`
-	Lang                string `json:"lang"`
-	PriorInput          string `json:"prior_input"`
-	PriorOutputRef      string `json:"prior_output_ref"`
-	PriorReply          string `json:"prior_reply"`
-	UserMessage         string `json:"user_message"`
-	Reply               string `json:"reply"`
-	ReplyRef            string `json:"reply_ref"`
-	ConversationRef     string `json:"conversation_ref"`
-	ExpectedWithheld    bool   `json:"expected_withheld"`
-	ExpectedConvFlagged bool   `json:"expected_conversation_flagged"`
-	Note                string `json:"note"`
+	ID                  string     `json:"id"`
+	Kind                string     `json:"kind"`
+	Lang                string     `json:"lang"`
+	History             []liveTurn `json:"history"`
+	UserMessage         string     `json:"user_message"`
+	Reply               string     `json:"reply"`
+	ReplyRef            string     `json:"reply_ref"`
+	ConversationRef     string     `json:"conversation_ref"`
+	ExpectedWithheld    bool       `json:"expected_withheld"`
+	ExpectedMinAction   Action     `json:"expected_min_action"`
+	ExpectedConvFlagged bool       `json:"expected_conversation_flagged"`
+	Note                string     `json:"note"`
 }
 
 type liveResult struct {
@@ -151,8 +157,20 @@ func playLive(t *testing.T, p *Policy, transport Transport, c liveCase, mode Mul
 	// The earlier turns, as a list of (role, text).
 	var prior [][2]string
 	latest, reply := c.UserMessage, c.Reply
-	switch {
-	case c.ConversationRef != "":
+	if c.ReplyRef != "" {
+		reply = outputs[c.ReplyRef]["text"].(string)
+	}
+	for _, h := range c.History {
+		text := h.Content
+		switch {
+		case h.Ref != "":
+			text = inputs[h.Ref]["text"].(string)
+		case h.RefOutputUser != "":
+			text = outputs[h.RefOutputUser]["user_message"].(string)
+		}
+		prior = append(prior, [2]string{h.Role, text})
+	}
+	if c.ConversationRef != "" {
 		turns := convs[c.ConversationRef]["turns"].([]any)
 		for _, x := range turns[:len(turns)-1] {
 			m := x.(map[string]any)
@@ -160,14 +178,12 @@ func playLive(t *testing.T, p *Policy, transport Transport, c liveCase, mode Mul
 		}
 		latest = turns[len(turns)-1].(map[string]any)["content"].(string)
 		reply = ""
+	}
+	switch {
+	case c.ConversationRef != "":
 		res.Want = c.ExpectedConvFlagged
-	case c.PriorOutputRef != "":
-		prior = [][2]string{{"user", outputs[c.PriorOutputRef]["user_message"].(string)}, {"assistant", c.PriorReply}}
-		reply = outputs[c.ReplyRef]["text"].(string)
-		res.Want = c.ExpectedWithheld
-	case c.PriorInput != "":
-		prior = [][2]string{{"user", inputs[c.PriorInput]["text"].(string)}, {"assistant", c.PriorReply}}
-		res.Want = c.ExpectedWithheld
+	case c.ExpectedMinAction != "":
+		res.Want = true
 	default:
 		res.Want = c.ExpectedWithheld
 	}
@@ -228,9 +244,14 @@ func playLive(t *testing.T, p *Policy, transport Transport, c liveCase, mode Mul
 	conv, _ := guard.CheckConversation(ctx, turns, nil)
 	res.ConvAction = conv.Action
 
-	if c.ConversationRef != "" {
+	switch {
+	case c.ConversationRef != "":
 		res.Correct = (Rank(conv.Action) >= Rank(Review)) == c.ExpectedConvFlagged
-	} else {
+	case c.ExpectedMinAction != "":
+		// A harmful reply is caught when it is held, or at least sent to review or handling.
+		reached := res.Held || (res.Output != nil && Rank(res.Output.Action) >= Rank(c.ExpectedMinAction))
+		res.Correct = reached
+	default:
 		res.Correct = res.Held == c.ExpectedWithheld
 	}
 	return res
@@ -306,4 +327,93 @@ func writeJSONL[T any](t *testing.T, path string, rows []T) {
 	for _, r := range rows {
 		_ = enc.Encode(r)
 	}
+}
+
+// TestLiveSingleTurnRegression runs the labelled single-turn sets under the policy before a change
+// (LIVE_POLICY_BEFORE, a path) and the bundled one, and reports every case whose verdict moved.
+func TestLiveSingleTurnRegression(t *testing.T) {
+	beforePath := os.Getenv("LIVE_POLICY_BEFORE")
+	if os.Getenv("JEV_API_KEY") == "" || beforePath == "" {
+		t.Skip("needs JEV_API_KEY and LIVE_POLICY_BEFORE")
+	}
+	before, err := LoadPolicy(beforePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	after := bundled(t)
+	transport, err := NewHTTPTransport(HTTPOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	type row struct {
+		id, surface string
+		want        Action
+		got         [2]Action
+	}
+	var rows []row
+	for _, set := range []struct{ path, surface string }{{"../examples/cases-input.jsonl", "input"}, {"../examples/cases-output.jsonl", "output"}} {
+		for _, c := range readJSONL(t, set.path) {
+			rows = append(rows, row{id: c["id"].(string), surface: set.surface, want: Action(c["expected_action"].(string))})
+		}
+	}
+	inputs := byID(readJSONL(t, "../examples/cases-input.jsonl"))
+	outputs := byID(readJSONL(t, "../examples/cases-output.jsonl"))
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, 6)
+	for i := range rows {
+		for k, p := range []*Policy{before, after} {
+			wg.Add(1)
+			go func(i, k int, p *Policy) {
+				defer wg.Done()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				g := New(Options{Policy: p, Transport: transport})
+				r := rows[i]
+				var v Verdict
+				if r.surface == "input" {
+					v, _ = g.CheckInput(ctx, inputs[r.id]["text"].(string), nil)
+				} else {
+					c := outputs[r.id]
+					var context []string
+					for _, x := range asSlice(c["context"]) {
+						context = append(context, x.(string))
+					}
+					um, _ := c["user_message"].(string)
+					v, _ = g.CheckOutput(ctx, c["text"].(string), &CheckOptions{UserMessage: um, Context: context})
+				}
+				rows[i].got[k] = v.Action
+			}(i, k, p)
+		}
+	}
+	wg.Wait()
+
+	var b strings.Builder
+	exact := [2]int{}
+	missed := [2]int{} // labelled block or review, but delivered as allow or flag
+	for _, r := range rows {
+		for k := range r.got {
+			if r.got[k] == r.want {
+				exact[k]++
+			}
+			if Rank(r.want) >= Rank(Review) && Rank(r.got[k]) <= Rank(Flag) {
+				missed[k]++
+			}
+		}
+		if r.got[0] != r.got[1] {
+			fmt.Fprintf(&b, "  moved: %-18s %-6s want=%-6s before=%-6s after=%s\n", r.id, r.surface, r.want, r.got[0], r.got[1])
+		}
+	}
+	fmt.Fprintf(&b, "\n  %d cases   exact: before %d, after %d   labelled review/block delivered: before %d, after %d\n",
+		len(rows), exact[0], exact[1], missed[0], missed[1])
+	t.Log("\n" + b.String())
+}
+
+func asSlice(v any) []any {
+	switch x := v.(type) {
+	case []any:
+		return x
+	case string:
+		return []any{x}
+	}
+	return nil
 }

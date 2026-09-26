@@ -103,6 +103,11 @@ type Finding struct {
 	Refs        []string
 	Source      string
 	Notes       []string
+	// Uncorroborated is true for a finding raised by a sentinel alone while the hazard choice gave
+	// its category next to nothing; see Policy.SentinelCorroboration.
+	Uncorroborated bool
+	// weak is an uncorroborated finding below its block band: never_below does not lift it.
+	weak bool
 }
 
 // MarshalJSON writes the same shape as the Python package's Finding.as_dict.

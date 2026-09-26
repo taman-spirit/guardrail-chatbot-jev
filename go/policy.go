@@ -259,6 +259,38 @@ func (p *Policy) FailClosed(surface Surface) bool {
 	return pyStr(setting) == "fail_closed"
 }
 
+// SentinelCorroboration is how a pack asks for a sentinel to be backed by the hazard choice before
+// it can drive the strongest actions on its own. It is off unless the pack sets
+// defaults.sentinel_corroboration.
+type SentinelCorroboration struct {
+	// MinChoice is the hazard-choice probability below which a sentinel counts as uncorroborated.
+	MinChoice float64
+	// Refusal is the refusal score from which a reply counts as declining.
+	Refusal float64
+	// RefusalMaxSentinel is the sentinel answer from which even a declining reply is not capped.
+	RefusalMaxSentinel float64
+	// RefusalExcept are categories a declining reply can still carry, so they are never capped.
+	RefusalExcept map[string]bool
+}
+
+// SentinelCorroboration reports the pack's setting, and whether it is on.
+func (p *Policy) SentinelCorroboration() (SentinelCorroboration, bool) {
+	raw, ok := p.Defaults["sentinel_corroboration"].(map[string]any)
+	if !ok {
+		return SentinelCorroboration{}, false
+	}
+	c := SentinelCorroboration{
+		MinChoice:          floatOr(raw["min_choice"], 0.02),
+		Refusal:            floatOr(raw["refusal"], 0.8),
+		RefusalMaxSentinel: floatOr(raw["refusal_max_sentinel"], 0.5),
+		RefusalExcept:      map[string]bool{},
+	}
+	for _, id := range stringsOf(raw["refusal_except"]) {
+		c.RefusalExcept[id] = true
+	}
+	return c, true
+}
+
 // ErrorAction is the action a fail-closed surface takes when Jev is unreachable.
 func (p *Policy) ErrorAction() Action {
 	if s, ok := p.Defaults["error_action"].(string); ok {

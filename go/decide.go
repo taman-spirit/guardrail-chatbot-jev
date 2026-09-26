@@ -30,18 +30,26 @@ func Decide(p *Policy, surface Surface, answers Answers, opts DecideOptions) Ver
 	signals := readSignals(p, answers)
 	probabilities, confidences, sentinelSourced := hazardProbabilities(p, surface, answers)
 
+	corroboration, checkCorroboration := p.SentinelCorroboration()
+	choice := mapOf(answers[Hazard]["probabilities"])
+
 	var findings []Finding
 	for _, cat := range p.ForSurface(surface) {
 		confidence, ok := confidences[cat.ID]
 		if !ok {
 			confidence = 1.0
 		}
-		if f, fired := finding(cat, surface, probabilities[cat.ID], confidence, sentinelSourced[cat.ID]); fired {
+		uncorroborated := checkCorroboration && sentinelSourced[cat.ID] &&
+			floatOr(choice[cat.ID], 0) < corroboration.MinChoice
+		if f, fired := finding(cat, surface, probabilities[cat.ID], confidence, sentinelSourced[cat.ID], uncorroborated); fired {
 			findings = append(findings, f)
 		}
 	}
 
 	findings, floors, applied := applyRules(p, surface, findings, signals, probabilities)
+	if checkCorroboration && surface == SurfaceOutput {
+		findings = capUncorroboratedOnRefusal(findings, signals, corroboration)
+	}
 
 	action := Allow
 	for _, f := range findings {
@@ -129,6 +137,26 @@ func WithFloor(p *Policy, v Verdict, floor Action, note string) Verdict {
 	return v
 }
 
+// capUncorroboratedOnRefusal lowers to flag an uncorroborated sentinel finding on a reply that
+// declines. Measured against Jev, a plain refusal ("I can't help with that") drew sentinel answers of
+// up to 0.26 for categories the reply never touched, while the hazard choice gave them nothing. The
+// categories a refusal can still leak, such as a system prompt or personal data, are exempt.
+func capUncorroboratedOnRefusal(findings []Finding, signals map[string]any, c SentinelCorroboration) []Finding {
+	refusal, ok := signals["refusal"].(float64)
+	if !ok || refusal < c.Refusal {
+		return findings
+	}
+	for i, f := range findings {
+		if !f.Uncorroborated || f.Probability >= c.RefusalMaxSentinel || c.RefusalExcept[f.Category] || Rank(f.Action) <= Rank(Flag) {
+			continue
+		}
+		f.Notes = append(append([]string(nil), f.Notes...), fmt.Sprintf("refusal with an uncorroborated sentinel: %s -> flag", f.Action))
+		f.Action = Flag
+		findings[i] = f
+	}
+	return findings
+}
+
 // -- internals -------------------------------------------------------------
 
 func errorKind(err error) string {
@@ -193,7 +221,7 @@ func hazardProbabilities(p *Policy, surface Surface, answers Answers) (map[strin
 	return probabilities, confidences, sentinelSourced
 }
 
-func finding(cat *Category, surface Surface, probability, confidence float64, sentinel bool) (Finding, bool) {
+func finding(cat *Category, surface Surface, probability, confidence float64, sentinel, uncorroborated bool) (Finding, bool) {
 	bands, ok := cat.Threshold(surface)
 	if !ok {
 		return Finding{}, false
@@ -214,7 +242,12 @@ func finding(cat *Category, surface Surface, probability, confidence float64, se
 	if categoryRoutes[cat.Route] {
 		notes = append(notes, fmt.Sprintf("handled by %s", cat.Route))
 	}
-	if cat.NeverBelow != "" {
+	// A sentinel alone, which the hazard choice does not back, answers at its own band: it may
+	// still reach block by crossing the block band, but never_below does not lift it there.
+	switch {
+	case cat.NeverBelow != "" && uncorroborated && probability < bands.Block:
+		notes = append(notes, fmt.Sprintf("uncorroborated sentinel: never below %s not applied", cat.NeverBelow))
+	case cat.NeverBelow != "":
 		action = Stronger(action, cat.NeverBelow)
 		notes = append(notes, fmt.Sprintf("never below %s", cat.NeverBelow))
 	}
@@ -223,15 +256,17 @@ func finding(cat *Category, surface Surface, probability, confidence float64, se
 		source = "sentinel"
 	}
 	return Finding{
-		Category:    cat.ID,
-		Name:        cat.Name,
-		Probability: probability,
-		Confidence:  confidence,
-		Action:      action,
-		Severity:    float64(cat.BaseSeverity),
-		Refs:        cat.Refs,
-		Source:      source,
-		Notes:       notes,
+		Category:       cat.ID,
+		Name:           cat.Name,
+		Probability:    probability,
+		Confidence:     confidence,
+		Action:         action,
+		Severity:       float64(cat.BaseSeverity),
+		Refs:           cat.Refs,
+		Source:         source,
+		Notes:          notes,
+		Uncorroborated: uncorroborated,
+		weak:           uncorroborated && probability < bands.Block,
 	}, true
 }
 
@@ -325,7 +360,7 @@ func adjust(f Finding, steps int, cap Action, ruleID string, p *Policy) Finding 
 	if cap != "" {
 		action = Weaker(action, cap)
 	}
-	if nb := p.Categories[f.Category].NeverBelow; nb != "" {
+	if nb := p.Categories[f.Category].NeverBelow; nb != "" && !f.weak {
 		action = Stronger(action, nb)
 	}
 	if action == f.Action {
@@ -388,6 +423,12 @@ func confidenceGate(p *Policy, action Action, confidence float64, findings []Fin
 func route(p *Policy, findings []Finding, action Action) Route {
 	var hazardRoute Route
 	for _, f := range findings {
+		// Only a finding that still counts sets the handling. One a rule capped to allow is a
+		// record, and a sentinel the hazard choice does not back, still at flag, must not replace an
+		// ordinary answer with a crisis message.
+		if Rank(f.Action) < Rank(Flag) || (f.Uncorroborated && f.Action == Flag) {
+			continue
+		}
 		if cat, ok := p.Categories[f.Category]; ok && categoryRoutes[cat.Route] {
 			hazardRoute = cat.Route
 			break

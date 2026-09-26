@@ -214,3 +214,66 @@ func TestASentinelStillInheritsAShakyRequest(t *testing.T) {
 		t.Fatalf("got %+v", v)
 	}
 }
+
+func TestAnUncorroboratedSentinelAnswersAtItsOwnBand(t *testing.T) {
+	p := bundled(t)
+	// The choice backs it (0.04 is well above 0.01): never_below still lifts it to block.
+	if v := decideOn(p, SurfaceInput, answers(A{"hazard": hazard(P{"cse": 0.04})})); v.Action != Block {
+		t.Fatalf("corroborated: %s", v.Action)
+	}
+	// A sentinel on its own, the choice giving cse nothing.
+	cases := []struct {
+		sentinel float64
+		want     Action
+	}{{0.04, Flag}, {0.1, Review}, {0.2, Block}}
+	for _, c := range cases {
+		v := decideOn(p, SurfaceInput, answers(A{"s_cse": noul(c.sentinel)}))
+		if v.Action != c.want || !v.Top().Uncorroborated {
+			t.Fatalf("s_cse=%v: got %s, want %s (%+v)", c.sentinel, v.Action, c.want, v.Top())
+		}
+	}
+}
+
+func TestARefusalIsNotBlockedForAnUncorroboratedSentinel(t *testing.T) {
+	p := bundled(t)
+	refusing := answers(A{"s_cse": noul(0.23), "s_iwp": noul(0.14), "refusal": noul(0.9)})
+	if v := decideOn(p, SurfaceOutput, refusing); v.Action != Flag || !v.Deliverable() {
+		t.Fatalf("got %+v", v)
+	}
+	// A refusal can still leak a system prompt: sid is exempt from the cap.
+	leaking := answers(A{"s_sid": noul(0.35), "refusal": noul(0.9)})
+	if v := decideOn(p, SurfaceOutput, leaking); v.Deliverable() {
+		t.Fatalf("a refusal leaking a system prompt got through: %+v", v)
+	}
+	// A strong sentinel is not capped, refusal or not.
+	if v := decideOn(p, SurfaceOutput, answers(A{"s_cse": noul(0.6), "refusal": noul(0.9)})); v.Action != Block {
+		t.Fatalf("got %s", v.Action)
+	}
+	// Without the pack setting, nothing changes.
+	var pack map[string]any
+	data, _ := bundledPacks.ReadFile("policies/standard-v1.json")
+	_ = json.Unmarshal(data, &pack)
+	delete(pack["defaults"].(map[string]any), "sentinel_corroboration")
+	old, _ := NewPolicy(pack)
+	if v := decideOn(old, SurfaceOutput, refusing); v.Action != Block {
+		t.Fatalf("with the setting removed: %s", v.Action)
+	}
+}
+
+func TestAWeakUncorroboratedSelfHarmSignalDoesNotReplaceTheAnswer(t *testing.T) {
+	p := bundled(t)
+	// "Còn ăn uống thì sao?" in a travel conversation, measured: s_ssh 0.07, choice ssh 0.01.
+	v := decideOn(p, SurfaceInput, answers(A{"hazard": hazard(P{"ssh": 0.01}, 0.98), "s_ssh": noul(0.07)}))
+	if v.Action != Flag || v.Route != RouteDeliver || !v.Deliverable() {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+	// A corroborated or strong signal still goes to crisis support.
+	for _, a := range []Answers{
+		answers(A{"hazard": hazard(P{"ssh": 0.2}), "s_ssh": noul(0.1)}),
+		answers(A{"s_ssh": noul(0.4)}),
+	} {
+		if v := decideOn(p, SurfaceInput, a); v.Route != RouteCrisisSupport {
+			t.Fatalf("got %s %s", v.Action, v.Route)
+		}
+	}
+}
