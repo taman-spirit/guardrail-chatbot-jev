@@ -40,18 +40,18 @@
 
 | リリース | タグ | 内容 | ライセンス |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.2) | `python/v1.1.2` | Python と TypeScript のパッケージ：3 つのチェック、マルチターンの帰属、リアルタイムのレビュー、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.2) | `go/v1.2.2` | 同じエンジンの Go 版。実測・再判定・回帰テストのツール付き | CC BY-NC 4.0 |
-| [Python：ベトナム準拠ポリシー v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.1) | `python-vietnam-compliance-v1.2.1` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
-| [Go：ベトナム準拠ポリシー v1.2.1](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.1) | `go-vietnam-compliance-v1.2.1` | 同じポリシーの Go 版（モジュールバージョン `v1.3.1`） | CC BY-NC 4.0 |
+| [Python SDK 1.1.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.3) | `python/v1.1.3` | Python と TypeScript のパッケージ：3 つのチェック、マルチターンの帰属、リアルタイムのレビュー、キャッシュ、プレフィルタ、セッション、ストリーミング、オフライン調整、CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.3) | `go/v1.2.3` | 同じエンジンの Go 版。実測・再判定・回帰テストのツール付き | CC BY-NC 4.0 |
+| [Python：ベトナム準拠ポリシー v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.2) | `python-vietnam-compliance-v1.2.2` | `vietnam-compliance-v1` ポリシーと、ベトナム語・英語・中国語の定型応答 | CC BY-NC 4.0 |
+| [Go：ベトナム準拠ポリシー v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.2) | `go-vietnam-compliance-v1.2.2` | 同じポリシーの Go 版（モジュールバージョン `v1.3.2`） | CC BY-NC 4.0 |
 
 各リリースノートに内容とインストール方法を記載しています。上の表と同じ順に：
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.2
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.1#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.1
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.3#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.3
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.2#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.2
 ```
 
 Python と TypeScript は `main`、Go は `go-sdk`、ベトナムポリシーは `guardrail-vietnam-compliance`（Python）と

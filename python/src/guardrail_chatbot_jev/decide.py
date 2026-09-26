@@ -425,13 +425,18 @@ def _route(policy: Policy, findings: list[Finding], action: Action) -> Route:
     # Only a finding that still counts sets the handling. One a rule capped to allow is a record, and
     # a sentinel the hazard choice does not back, still at flag, must not replace an ordinary answer
     # with a crisis message.
+    #
+    # The crisis route answers only when self-harm leads. The self-harm sentinel answers 0.15 to 0.66
+    # on a request to build a bomb or bring down a building, which is about harming others; a crisis
+    # message in reply answers the wrong question. The finding keeps its action, so the content is
+    # still held.
     hazard_route = next(
         (
             policy.categories[f.category].route
             for f in findings
-            if rank(f.action) >= rank("flag")
-            and not (f.uncorroborated and f.action == "flag")
+            if _route_counts(f)
             and policy.categories[f.category].route in _CATEGORY_ROUTES
+            and (policy.categories[f.category].route != "crisis_support" or _leads(f, findings))
         ),
         None,
     )
@@ -444,6 +449,22 @@ def _route(policy: Policy, findings: list[Finding], action: Action) -> Route:
     if hazard_route in ("redact", "guide"):
         return hazard_route  # type: ignore[return-value]
     return "human_review" if action == "review" else "deliver"
+
+
+def _route_counts(f: Finding) -> bool:
+    """Whether a finding can set the handling."""
+    return rank(f.action) >= rank("flag") and not (f.uncorroborated and f.action == "flag")
+
+
+def _leads(f: Finding, findings: list[Finding]) -> bool:
+    """No other finding that counts is ahead of ``f``: none at a stronger action, and none at the same
+    action with a higher probability. A tie goes to ``f``."""
+    return not any(
+        g.category != f.category
+        and _route_counts(g)
+        and (rank(g.action) > rank(f.action) or (g.action == f.action and g.probability > f.probability))
+        for g in findings
+    )
 
 
 def _severity(signals: Mapping[str, Any], findings: list[Finding]) -> float:
