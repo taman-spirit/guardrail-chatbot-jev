@@ -3,6 +3,15 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Go 1.2.2, Python 1.1.2] - 2026-09-26
+
+### Documentation
+
+- README, Definitions: a table of the settings in use and one of every category's thresholds, the
+  rules and the single-turn calibration explained in words before the formulas, and each formula
+  block followed by links to the code that implements it. In English, Vietnamese, French and Japanese.
+- README, Releases: the demo at https://nhatnguyet.org/tro-ly-ai.
+
 ## [Go 1.2.1, Python 1.1.1] - 2026-09-26
 
 ### Fixed
