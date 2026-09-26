@@ -302,7 +302,7 @@ conversation:     escalation ≤ 0.5 → at most flag,  except cse, ssh
 
 ### リアルタイムでのレビュー
 
-`ReviewHandling: ReviewAsAudit`： ([`ReviewAsAudit`](go/guard.go#L52), [`audit`](go/guard.go#L303))内容を止めるのは `block` のみ。`review` は配信して優先監査へ、`flag` は
+`ReviewHandling: ReviewAsAudit`（[`ReviewAsAudit`](go/guard.go#L52)、[`audit`](go/guard.go#L303)）：内容を止めるのは `block` のみ。`review` は配信して優先監査へ、`flag` は
 サンプリング監査へ回す。fail-closed の面の degraded 判定は保留のまま。
 
 ### 結果
