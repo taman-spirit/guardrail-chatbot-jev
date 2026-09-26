@@ -13,6 +13,12 @@ from typing import Any, Mapping, Sequence
 
 from .types import LADDER, Action, Turn, Verdict, as_turns, rank, stronger
 
+#: Stands in the transcript for a message the guardrail withheld. The attempt stays visible to the
+#: conversation check, but its text does not: neither Jev nor the model reads a blocked request again.
+#: The wording is neutral on purpose: measured against Jev, "[message withheld by the safety check]"
+#: still drew sentinel answers of 0.08 to 0.15 after a harmless question; this one drew 0.04 or less.
+WITHHELD_PLACEHOLDER = "[earlier message omitted]"
+
 #: How much each action contributes to the session's risk score.
 ACTION_RISK: Mapping[Action, float] = {"allow": 0.0, "flag": 0.25, "review": 0.6, "block": 1.0}
 
@@ -58,6 +64,25 @@ class Session:
     def history(self) -> tuple[Turn, ...]:
         return tuple(self.turns)
 
+    def record(self, role: str, content: str, verdict: Verdict) -> None:
+        """Append a turn given the verdict on it; a withheld turn is kept as the placeholder."""
+        self.add_turn(role, content if verdict.deliverable else WITHHELD_PLACEHOLDER)
+
+    def model_history(self) -> tuple[Turn, ...]:
+        """The transcript for the chat model: withheld turns are left out entirely."""
+        return tuple(t for t in self.turns if t.content != WITHHELD_PLACEHOLDER)
+
+    def watching(self, threshold: float = 0.2) -> bool:
+        """Whether replies should also be read in context.
+
+        On while a conversation-level review or a block is inside ``carry_turns`` completed turns,
+        while the risk has not decayed below ``threshold``, or while a withheld turn is still in the
+        window. It never holds anything by itself; it only decides whether a second read is paid for.
+        """
+        if self._floor_left > 0 or self.risk >= threshold:
+            return True
+        return any(t.content == WITHHELD_PLACEHOLDER for t in self.turns)
+
     # -- risk ---------------------------------------------------------
 
     @property
@@ -97,10 +122,11 @@ class Session:
 
     def metadata(self) -> dict[str, Any]:
         """Deployment context worth putting in front of Jev on later turns."""
+        # The risk score is deliberately not here: in front of Jev it invites judging the current
+        # message by the conversation's past, which is the contamination the session exists to avoid.
         return {
             "conversation_id": self.id,
             "turn_number": len(self.turns) + 1,
-            "session_risk": round(self.risk, 3),
         }
 
     def as_state(self) -> dict[str, Any]:
