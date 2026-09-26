@@ -3,6 +3,17 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Python Viet Nam compliance 1.2.0] - 2026-09-26
+
+### Changed
+
+- Includes Python 1.1.1: multi-turn attribution, realtime review as audit, sentinel corroboration.
+- The Viet Nam pack never weakens a lone self-harm, sovereignty or leader signal
+  (`sentinel_corroboration.weak_except: ["ssh", "vsv", "vld"]`), and a refusal does not excuse a
+  sovereignty or leader claim.
+- The review reply no longer promises a staff reply that a realtime chat cannot give.
+- `scripts/build-packs.py` merges an overlay's `defaults` by key.
+
 ## [Python 1.1.1] - 2026-09-26
 
 ### Fixed
