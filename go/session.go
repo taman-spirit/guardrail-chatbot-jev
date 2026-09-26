@@ -33,8 +33,8 @@ type Session struct {
 	floor     Action
 	floorLeft int
 	// held runs beside Turns: the verdict that withheld each turn, or nil. Record sets it and
-	// Responder.ModelHistory reads it; when Turns is edited directly the two stop matching and
-	// withheld turns are then told without their group.
+	// ModelHistory and Responder.ModelHistory read it; when Turns is edited directly the two stop
+	// matching and withheld turns are then told without a reason.
 	held []*Verdict
 }
 
@@ -157,6 +157,7 @@ func (s *Session) AsState() map[string]any {
 		"risk":             s.Risk,
 		"floor":            floor,
 		"floor_turns_left": s.floorLeft,
+		"withheld":         s.withheldState(),
 	}
 }
 
@@ -189,6 +190,7 @@ func SessionFromState(state map[string]any) *Session {
 			}
 		}
 	}
+	s.restoreWithheld(state["withheld"])
 	floor := Action(stringOr(state["floor"], string(Allow)))
 	left := intOr(state["floor_turns_left"], 0)
 	// A floor that outlived its counter, or a value no longer in the ladder, is no floor.

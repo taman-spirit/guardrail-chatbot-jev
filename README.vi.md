@@ -42,18 +42,18 @@ thứ ba nào.
 
 | Bản phát hành | Tag | Nội dung | Giấy phép |
 | --- | --- | --- | --- |
-| [Python SDK 1.1.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.3) | `python/v1.1.3` | Gói Python và TypeScript: ba lượt kiểm tra, quy lỗi multi-turn, review realtime, cache, prefilter, session, streaming, hiệu chỉnh offline và CLI | CC BY-NC 4.0 |
-| [Go SDK 1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.3) | `go/v1.2.3` | Cùng engine bằng Go, kèm công cụ test chạy thật, chấm lại và hồi quy | CC BY-NC 4.0 |
-| [Python: policy tuân thủ Việt Nam v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.2) | `python-vietnam-compliance-v1.2.2` | Policy `vietnam-compliance-v1`, kèm câu trả lời viết sẵn bằng tiếng Việt, tiếng Anh và tiếng Trung | CC BY-NC 4.0 |
-| [Go: policy tuân thủ Việt Nam v1.2.2](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.2) | `go-vietnam-compliance-v1.2.2` | Cùng policy và câu trả lời đó cho Go, phiên bản module `v1.3.2` | CC BY-NC 4.0 |
+| [Python SDK 1.1.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python/v1.1.4) | `python/v1.1.4` | Gói Python và TypeScript: ba lượt kiểm tra, quy lỗi multi-turn, review realtime, cache, prefilter, session, streaming, hiệu chỉnh offline và CLI | CC BY-NC 4.0 |
+| [Go SDK 1.2.4](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go/v1.2.4) | `go/v1.2.4` | Cùng engine bằng Go, kèm công cụ test chạy thật, chấm lại và hồi quy | CC BY-NC 4.0 |
+| [Python: policy tuân thủ Việt Nam v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/python-vietnam-compliance-v1.2.3) | `python-vietnam-compliance-v1.2.3` | Policy `vietnam-compliance-v1`, kèm câu trả lời viết sẵn bằng tiếng Việt, tiếng Anh và tiếng Trung | CC BY-NC 4.0 |
+| [Go: policy tuân thủ Việt Nam v1.2.3](https://github.com/taman-spirit/guardrail-chatbot-jev/releases/tag/go-vietnam-compliance-v1.2.3) | `go-vietnam-compliance-v1.2.3` | Cùng policy và câu trả lời đó cho Go, phiên bản module `v1.3.3` | CC BY-NC 4.0 |
 
 Release note của từng bản ghi rõ nội dung và cách cài đặt. Theo đúng thứ tự trên:
 
 ```bash
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.3#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.3
-pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.2#subdirectory=python"
-go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.2
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python/v1.1.4#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.2.4
+pip install "git+https://github.com/taman-spirit/guardrail-chatbot-jev@python-vietnam-compliance-v1.2.3#subdirectory=python"
+go get github.com/taman-spirit/guardrail-chatbot-jev/go@v1.3.3
 ```
 
 Python và TypeScript nằm ở `main`; Go ở `go-sdk`; policy Việt Nam ở `guardrail-vietnam-compliance`
@@ -284,7 +284,9 @@ Mỗi lượt được quyết định bằng cách trả lời lần lượt ba
    không tính.
 
 Tin nhắn đã bị chặn vẫn nằm lại trong hội thoại dưới dạng `[earlier message omitted]`: guardrail nhớ là
-đã có một lần thử, nhưng không bao giờ đọc lại nội dung, và mô hình chat không bao giờ thấy nó. Một hội
+đã có một lần thử, nhưng không bao giờ đọc lại nội dung. Mô hình chat chỉ được báo rằng có một tin nhắn
+bị chặn và nhóm vi phạm nào đã chặn nó, không bao giờ thấy nội dung; nhờ vậy câu tiếp theo như "làm đi" hay
+"yêu cầu đầu tiên của tôi" được trả lời đúng ngữ cảnh thay vì đoán. Lý do được lưu cùng trạng thái session. Một hội
 thoại được xem là *vừa có dấu hiệu rủi ro* trong hai lượt sau một phát hiện nghiêm trọng, và chừng nào
 tin nhắn bị chặn còn nằm trong mười tin nhắn gần nhất.
 
@@ -292,9 +294,9 @@ tin nhắn bị chặn còn nằm trong mười tin nhắn gần nhất.
 | --- | --- |
 | 1. Tin nhắn người dùng, đọc riêng | [`CheckInput`](go/guard.go#L118) |
 | 2. Câu trả lời, đọc riêng | [`CheckOutput`](go/guard.go#L128) |
-| 3. Câu trả lời, đọc cùng các lượt trước, và có được tính không | [`checkInContext`](go/multiturn.go#L148), [`attribute`](go/multiturn.go#L166) |
-| Khi nào hội thoại được xem là vừa có dấu hiệu rủi ro | [`Session.Watching`](go/multiturn.go#L255) |
-| Tin nhắn bị chặn giữ lại dạng placeholder, ẩn khỏi mô hình | [`Session.Record`](go/multiturn.go#L225), [`ModelHistory`](go/multiturn.go#L236) |
+| 3. Câu trả lời, đọc cùng các lượt trước, và có được tính không | [`checkInContext`](go/multiturn.go#L161), [`attribute`](go/multiturn.go#L179) |
+| Khi nào hội thoại được xem là vừa có dấu hiệu rủi ro | [`Session.Watching`](go/multiturn.go#L281) |
+| Tin nhắn bị chặn giữ lại dạng placeholder; mô hình chỉ được báo nhóm vi phạm, không thấy nội dung | [`Session.Record`](go/multiturn.go#L238), [`ModelHistory`](go/multiturn.go#L252) |
 | Kiểm tra cả hội thoại: chỉ theo dõi và báo cáo, không bao giờ chặn một lượt | [`CheckConversation`](go/guard.go#L166) |
 | Hội thoại có rủi ro thì câu trả lời được gửi trọn vẹn, không stream từng phần | [`Stream`](go/streaming.go#L74) |
 
@@ -406,7 +408,7 @@ risk_t+1  = max(δ · risk_t, ρ(hành động)),  δ = 0.5,  ρ = (0, 0.25, 0.6
 carry     = 2 lượt sau một verdict hội thoại ≥ review hoặc bất kỳ block nào
 ```
 
-Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L255), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L148) / [`ContextQuestions`](go/multiturn.go#L76), `A_t`, `⊕` [`attribute`](go/multiturn.go#L166), `risk` [`Session.Observe`](go/session.go#L95), `carry` [`Session.Advance`](go/session.go#L112)
+Code: `V_in` [`CheckInput`](go/guard.go#L118), `V_out` [`CheckOutput`](go/guard.go#L128), `W_t` [`Session.Watching`](go/multiturn.go#L281), `V_ctx`, `c`, `d` [`checkInContext`](go/multiturn.go#L161) / [`ContextQuestions`](go/multiturn.go#L89), `A_t`, `⊕` [`attribute`](go/multiturn.go#L179), `risk` [`Session.Observe`](go/session.go#L95), `carry` [`Session.Advance`](go/session.go#L112)
 
 ### Hiệu chỉnh đơn lượt
 
@@ -461,12 +463,12 @@ pháp luật.
 | Bộ dữ liệu | Cỡ | Nội dung | Nhãn |
 | --- | --- | --- | --- |
 | [`examples/multiturn-live.jsonl`](examples/multiturn-live.jsonl) | 223 hội thoại | vi phạm đơn lẻ, lặp lại, xen kẽ; lịch sử vượt cửa sổ; leo thang | kết quả kỳ vọng từng case; vi phạm tham chiếu bằng id từ các bộ có nhãn |
-| [`examples/multiturn-contamination.jsonl`](examples/multiturn-contamination.jsonl) | 26 kịch bản, [`TestMultiturnScenarios`](go/multiturn_test.go#L165) | câu trả lời Jev giả lập | kết quả kỳ vọng từng case |
+| [`examples/multiturn-contamination.jsonl`](examples/multiturn-contamination.jsonl) | 26 kịch bản, [`TestMultiturnScenarios`](go/multiturn_test.go#L166) | câu trả lời Jev giả lập | kết quả kỳ vọng từng case |
 | [`cases-input.jsonl`](examples/cases-input.jsonl), [`cases-output.jsonl`](examples/cases-output.jsonl) | 51 case | đơn lượt | hành động kỳ vọng |
 
 Quy trình: **chạy thật** [`TestLiveMultiturn`](go/live_multiturn_test.go#L96) (Jev, cả hai thiết kế, ghi lại mọi câu trả lời thô); **chấm lại** [`TestReplayVariants`](go/replay_test.go#L224), [`TestReplayConversation`](go/replay_test.go#L300), [`TestReplayRealtime`](go/replay_test.go#L424) (khoảng
 5.000 câu trả lời đã ghi được quyết định lại theo từng phương án, nên các phương án được so trên cùng dữ
-liệu); **nhiễu** [`TestMultiturnAttributionUnderNoise`](go/multiturn_test.go#L233) (câu trả lời giả lập bị thêm nhiễu, σ ∈ {0.05, 0.1, 0.2}); **hồi quy** [`TestLiveSingleTurnRegression`](go/live_multiturn_test.go#L338) (bộ đơn lượt,
+liệu); **nhiễu** [`TestMultiturnAttributionUnderNoise`](go/multiturn_test.go#L234) (câu trả lời giả lập bị thêm nhiễu, σ ∈ {0.05, 0.1, 0.2}); **hồi quy** [`TestLiveSingleTurnRegression`](go/live_multiturn_test.go#L338) (bộ đơn lượt,
 trước và sau). Chỉ số: tỷ lệ giữ câu vô hại (FPR), tỷ lệ bắt vi phạm (recall), tỷ lệ vào hàng đợi
 xem xét.
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 )
 
 // History is for understanding the current turn, never for convicting it.
@@ -56,6 +57,18 @@ type ContextCheck struct {
 // block on the lowest thresholds, because the words themselves suggest danger; "[earlier message
 // omitted]" drew 0.04 or less, about what no placeholder at all draws.
 const WithheldPlaceholder = "[earlier message omitted]"
+
+// WithheldNote is what ModelHistory tells the chat model in place of a withheld user message.
+// {label} is the names of the categories that stopped it; the message's text is never included.
+var WithheldNote = "[The user's message here was withheld by the content check ({label}). The assistant did not see " +
+	"it and declined. Do not carry out the withheld request, even if the user repeats it or asks to continue.]"
+
+// WithheldReplyNote is what ModelHistory tells the chat model in place of a withheld reply.
+var WithheldReplyNote = "[The assistant's reply here was withheld by the content check ({label}); the user did not see it.]"
+
+// DeclinedReply is the assistant turn ModelHistory adds after a withheld user message when none
+// was recorded.
+var DeclinedReply = "I can't help with that request."
 
 // Names of the questions the in-context check adds.
 const (
@@ -231,13 +244,26 @@ func (s *Session) Record(role, content string, v Verdict) {
 	s.addTurn(role, WithheldPlaceholder, &held)
 }
 
-// ModelHistory is the transcript to send to the chat model: withheld turns are left out, so the
-// model never sees a blocked request, not even as a placeholder it might try to answer.
+// ModelHistory is the transcript for the chat model, with each withheld turn told rather than
+// dropped. A withheld user message becomes WithheldNote naming the categories that stopped it,
+// never its text, followed by DeclinedReply unless a reply was recorded after it; a withheld reply
+// becomes WithheldReplyNote. Dropping them instead left the model to meet "do it" or "my first
+// request" with nothing before it, and it guessed.
 func (s *Session) ModelHistory() []Turn {
 	var out []Turn
-	for _, t := range s.Turns {
+	for i, t := range s.Turns {
 		if t.Content != WithheldPlaceholder {
 			out = append(out, t)
+			continue
+		}
+		label := WithheldLabel(s.heldVerdict(i))
+		if t.Role != "user" {
+			out = append(out, Turn{Role: t.Role, Content: strings.ReplaceAll(WithheldReplyNote, "{label}", label)})
+			continue
+		}
+		out = append(out, Turn{Role: "user", Content: strings.ReplaceAll(WithheldNote, "{label}", label)})
+		if i+1 >= len(s.Turns) || s.Turns[i+1].Role != "assistant" {
+			out = append(out, Turn{Role: "assistant", Content: DeclinedReply})
 		}
 	}
 	return out
@@ -272,4 +298,124 @@ func sortFindings(findings []Finding) {
 		}
 		return 0
 	})
+}
+
+// WithheldLabel is the names of the categories that withheld a turn, strongest first, for the
+// model's note.
+func WithheldLabel(v *Verdict) string {
+	if v == nil {
+		return "reason not recorded"
+	}
+	top := -1
+	for _, f := range v.Findings {
+		if Rank(f.Action) >= Rank(Flag) {
+			top = max(top, Rank(f.Action))
+		}
+	}
+	if top < 0 {
+		if v.Degraded {
+			return "the check was unavailable"
+		}
+		return "reason not recorded"
+	}
+	var names []string
+	for _, f := range v.Findings {
+		name := f.Name
+		if name == "" {
+			name = f.Category
+		}
+		if Rank(f.Action) == top && !slices.Contains(names, name) {
+			names = append(names, name)
+		}
+	}
+	return strings.Join(names, ", ")
+}
+
+// withheldState is what a store keeps of each withheld turn's verdict, beside the turns: enough to
+// say why it was withheld. The keys are the same in every language.
+func (s *Session) withheldState() []any {
+	out := make([]any, len(s.Turns))
+	for i, t := range s.Turns {
+		v := s.heldVerdict(i)
+		if t.Content != WithheldPlaceholder || v == nil {
+			continue
+		}
+		findings := make([]any, 0, len(v.Findings))
+		for _, f := range v.Findings {
+			findings = append(findings, map[string]any{
+				"category": f.Category, "name": f.Name, "action": string(f.Action), "probability": round(f.Probability, 4),
+			})
+		}
+		signals := map[string]any{}
+		for k, val := range v.Signals {
+			switch val.(type) {
+			case string, float64, float32, int, int64:
+				signals[k] = val
+			}
+		}
+		rules := make([]any, 0, len(v.AppliedRules))
+		for _, r := range v.AppliedRules {
+			rules = append(rules, r)
+		}
+		out[i] = map[string]any{
+			"action": string(v.Action), "surface": string(v.Surface), "route": string(v.Route),
+			"degraded": v.Degraded, "findings": findings, "applied_rules": rules, "signals": signals,
+		}
+	}
+	return out
+}
+
+// restoreWithheld reads withheldState back, aligned from the end as the window keeps the most
+// recent turns. A malformed entry is no reason.
+func (s *Session) restoreWithheld(raw any) {
+	entries, ok := raw.([]any)
+	if !ok || len(entries) < len(s.Turns) {
+		return
+	}
+	entries = entries[len(entries)-len(s.Turns):]
+	s.held = make([]*Verdict, len(s.Turns))
+	for i, e := range entries {
+		m, ok := e.(map[string]any)
+		if !ok || s.Turns[i].Content != WithheldPlaceholder {
+			continue
+		}
+		v := Verdict{
+			Action:   actionOr(m["action"], Block),
+			Surface:  Surface(stringOr(m["surface"], string(SurfaceInput))),
+			Route:    Route(stringOr(m["route"], string(RouteSafeResponse))),
+			Degraded: m["degraded"] == true,
+			Signals:  map[string]any{},
+		}
+		if fs, ok := m["findings"].([]any); ok {
+			for _, x := range fs {
+				f, ok := x.(map[string]any)
+				category := stringOr(f["category"], "")
+				if !ok || category == "" {
+					continue
+				}
+				v.Findings = append(v.Findings, Finding{
+					Category: category, Name: stringOr(f["name"], category),
+					Action: actionOr(f["action"], Flag), Probability: floatOr(f["probability"], 0), Confidence: 1,
+				})
+			}
+		}
+		if rs, ok := m["applied_rules"].([]any); ok {
+			for _, r := range rs {
+				if r, ok := r.(string); ok {
+					v.AppliedRules = append(v.AppliedRules, r)
+				}
+			}
+		}
+		if sig, ok := m["signals"].(map[string]any); ok {
+			v.Signals = sig
+		}
+		s.held[i] = &v
+	}
+}
+
+func actionOr(v any, fallback Action) Action {
+	if a := Action(stringOr(v, "")); validAction(a) {
+		return a
+	}
+	return fallback
 }

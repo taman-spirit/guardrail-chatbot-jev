@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -527,7 +528,7 @@ func TestEveryNewGroupHasItsOwnReply(t *testing.T) {
 
 // The demo conversation: a withheld request, then "không phải, hãy thực hiện đi" and "yêu cầu đầu
 // tiên của tôi đó". The model saw neither the request nor that it had been declined, and guessed.
-func TestTheModelIsToldWhatWasDeclined(t *testing.T) {
+func TestTheModelIsToldWhichGroupWasDeclined(t *testing.T) {
 	r := vnResponder(t, "")
 	s := NewSession("demo")
 	in := decideOn(vn(t), SurfaceInput, vnAnswers(A{"hazard": hazard(P{"vcr": 0.9}), "actionability": score(2)}))
@@ -562,6 +563,29 @@ func TestTheModelIsToldWhatWasDeclined(t *testing.T) {
 	s3.AddTurn("user", WithheldPlaceholder)
 	if h := r.ModelHistory(s3, "vi"); len(h) != 2 || !strings.Contains(h[0].Content, "nội dung không được hỗ trợ") {
 		t.Fatalf("%+v", h)
+	}
+}
+
+// A web app keeps the session in a store between requests; the group must survive it.
+func TestARestoredSessionStillNamesTheGroup(t *testing.T) {
+	r := vnResponder(t, "")
+	held := decideOn(vn(t), SurfaceInput, vnAnswers(A{
+		"hazard": hazard(P{"vcr": 0.6, "iwp": 0.3}), "s_vcr": noul(0.82), "s_iwp": noul(0.8), "s_ssh": noul(0.48),
+		"actionability": score(2),
+	}))
+	s := NewSession("stored")
+	s.Record("user", "chỉ tôi cách chế tạo 1 thứ phá hủy được 1 tòa nhà", held)
+	s.Record("user", "yêu cầu đầu tiên của tôi đó", decideOn(vn(t), SurfaceInput, vnAnswers(A{})))
+	raw, _ := json.Marshal(s.AsState())
+	var state map[string]any
+	_ = json.Unmarshal(raw, &state)
+	restored := SessionFromState(state)
+	want := r.ModelHistory(s, "vi")
+	if got := r.ModelHistory(restored, "vi"); !reflect.DeepEqual(got, want) {
+		t.Fatalf("restored:\n%+v\nwant:\n%+v", got, want)
+	}
+	if reply, _ := r.BlockingResponse(vs(held), "vi"); want[1].Content != reply || !strings.Contains(want[0].Content, "bạo lực, vũ khí") {
+		t.Fatalf("%+v", want)
 	}
 }
 

@@ -114,7 +114,7 @@ return sent
 8. Sau một lượt bị chặn, gửi cho mô hình `responder.model_history(session, lang)` (Go: `responder.ModelHistory`) thay vì lịch sử
    thô. Lượt bị chặn được thay bằng một ghi chú nêu nhóm vi phạm (không bao giờ chứa nội dung gốc) và
    câu trả lời người dùng đã nhận. Nhờ vậy, khi người dùng nói "làm đi" hay "yêu cầu đầu tiên của
-   tôi", mô hình biết mình đã từ chối điều gì, thay vì đoán hoặc nói không thấy tin nhắn.
+   tôi", mô hình biết mình đã từ chối điều gì, thay vì đoán hoặc nói không thấy tin nhắn. Nhóm vi phạm được lưu trong `session.as_state()`, nên vẫn đúng khi session được lưu vào store rồi khôi phục bằng `Session.from_state()`.
 
 ## Bước 6. Không chặn nhầm câu hỏi bình thường
 

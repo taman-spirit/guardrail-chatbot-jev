@@ -71,7 +71,7 @@ type responsesSpec struct {
 		Note   texts            `json:"note"`
 		Labels map[string]texts `json:"labels"`
 	} `json:"withheld"`
-	Affirmation       struct {
+	Affirmation struct {
 		TriggerSignal string   `json:"trigger_signal"`
 		TriggerValue  *float64 `json:"trigger_value"`
 		NotAfterRules []string `json:"not_after_rules"`
