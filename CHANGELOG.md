@@ -3,7 +3,7 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [Go 1.3.2, Viet Nam compliance 1.2.2] - 2026-09-26
 
 ### Fixed
 
