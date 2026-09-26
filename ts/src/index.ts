@@ -60,8 +60,15 @@ export {
   SENTINEL_PREFIX,
 } from "./questions.js";
 export type { Metadata, Question } from "./questions.js";
-export { ACTION_RISK, Session } from "./session.js";
-export type { SessionConfig, SessionState } from "./session.js";
+export {
+  ACTION_RISK,
+  DECLINED_REPLY,
+  Session,
+  WITHHELD_NOTE,
+  WITHHELD_REPLY_NOTE,
+  withheldLabel,
+} from "./session.js";
+export type { SessionConfig, SessionState, WithheldSummary } from "./session.js";
 export { guardStream } from "./streaming.js";
 export type { StreamEvent, StreamEventType, StreamOptions } from "./streaming.js";
 export { GuardrailError, LADDER, rank, shift, stronger, weaker, WITHHOLDING } from "./types.js";

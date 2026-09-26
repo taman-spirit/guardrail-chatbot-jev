@@ -3,6 +3,20 @@
 All notable changes to this project are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Python 1.1.4] - 2026-09-26
+
+### Changed
+
+- `Session.model_history()` (`modelHistory()` in TypeScript) tells the chat model about each
+  withheld turn instead of dropping it. A withheld user message becomes `WITHHELD_NOTE`, naming the
+  categories that stopped it and never its text, followed by `DECLINED_REPLY` unless a reply was
+  recorded after it; a withheld reply becomes `WITHHELD_REPLY_NOTE`. Dropping them left the model to
+  meet "do it" or "my first request" with nothing before it, and it guessed. Jev still reads only
+  the neutral placeholder.
+- `Session.record` keeps why each turn was withheld, trimmed with the transcript window, and
+  `as_state` / `from_state` carry it under `withheld`, in the same shape in Python, TypeScript and
+  Go, so a session restored from a store still knows the reason.
+
 ## [Python 1.1.3] - 2026-09-26
 
 ### Fixed
