@@ -24,7 +24,12 @@
       "min_choice": 0.02,
       "refusal": 0.8,
       "refusal_max_sentinel": 0.5,
-      "refusal_except": ["sid", "prv", "ipv"]
+      "refusal_except": ["sid", "prv", "ipv"],
+      "weak_at_most_flag": true
+    },
+    "confidence_gate": {
+      "skip_when_intent": ["benign"],
+      "skip_min_confidence": 0.5
     }
   },
   "severity_scale": [
@@ -325,10 +330,7 @@
         "AILuminate spc_hlt / spc_fin",
         "Llama Guard S6"
       ],
-      "surfaces": [
-        "output",
-        "conversation"
-      ],
+      "surfaces": ["output"],
       "weight": 0.5,
       "base_severity": 2,
       "sentinel": false,
@@ -691,6 +693,13 @@
         "floor_action": "review",
         "add_finding": "pij"
       }
+    },
+    {
+      "id": "no-escalation-caps-conversation",
+      "when": {"signal": "escalation", "op": "<=", "value": 0.5},
+      "except_categories": ["cse", "ssh"],
+      "then": {"cap_action": "flag"},
+      "why": "A conversation that is not moving toward a harmful objective is not a multi-turn attack, whatever topics it has touched. Measured live, this halves the harmless conversations sent to review and keeps every escalation."
     }
   ],
   "action_ladder": [

@@ -271,6 +271,33 @@ type SentinelCorroboration struct {
 	RefusalMaxSentinel float64
 	// RefusalExcept are categories a declining reply can still carry, so they are never capped.
 	RefusalExcept map[string]bool
+	// WeakAtMostFlag caps an uncorroborated sentinel below its block band at flag: it is recorded
+	// and delivered, rather than held, unless it crosses the block band on its own.
+	WeakAtMostFlag bool
+}
+
+// ConfidenceGateOptions narrow when a low-confidence answer escalates to review.
+type ConfidenceGateOptions struct {
+	// NeedsCorroboration counts only findings and near misses the hazard choice backs.
+	NeedsCorroboration bool
+	// SkipWhenIntent lists intent labels for which the gate does not escalate, as long as the
+	// answer's confidence is at least SkipMinConfidence: below that the intent is itself a guess.
+	SkipWhenIntent    map[string]bool
+	SkipMinConfidence float64
+}
+
+// ConfidenceGate reports the pack's defaults.confidence_gate options.
+func (p *Policy) ConfidenceGate() ConfidenceGateOptions {
+	raw, _ := p.Defaults["confidence_gate"].(map[string]any)
+	o := ConfidenceGateOptions{
+		NeedsCorroboration: truthy(raw["needs_corroboration"]),
+		SkipWhenIntent:     map[string]bool{},
+		SkipMinConfidence:  floatOr(raw["skip_min_confidence"], 0.5),
+	}
+	for _, s := range stringsOf(raw["skip_when_intent"]) {
+		o.SkipWhenIntent[s] = true
+	}
+	return o
 }
 
 // SentinelCorroboration reports the pack's setting, and whether it is on.
@@ -284,6 +311,7 @@ func (p *Policy) SentinelCorroboration() (SentinelCorroboration, bool) {
 		Refusal:            floatOr(raw["refusal"], 0.8),
 		RefusalMaxSentinel: floatOr(raw["refusal_max_sentinel"], 0.5),
 		RefusalExcept:      map[string]bool{},
+		WeakAtMostFlag:     truthy(raw["weak_at_most_flag"]),
 	}
 	for _, id := range stringsOf(raw["refusal_except"]) {
 		c.RefusalExcept[id] = true

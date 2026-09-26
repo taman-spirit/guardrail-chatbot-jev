@@ -50,6 +50,15 @@ func Decide(p *Policy, surface Surface, answers Answers, opts DecideOptions) Ver
 	if checkCorroboration && surface == SurfaceOutput {
 		findings = capUncorroboratedOnRefusal(findings, signals, corroboration)
 	}
+	if checkCorroboration && corroboration.WeakAtMostFlag {
+		for i, f := range findings {
+			if f.weak && Rank(f.Action) > Rank(Flag) {
+				f.Notes = append(append([]string(nil), f.Notes...), fmt.Sprintf("uncorroborated sentinel below its block band: %s -> flag", f.Action))
+				f.Action = Flag
+				findings[i] = f
+			}
+		}
+	}
 
 	action := Allow
 	for _, f := range findings {
@@ -60,7 +69,7 @@ func Decide(p *Policy, surface Surface, answers Answers, opts DecideOptions) Ver
 	}
 
 	confidence := overallConfidence(answers, findings, confidences)
-	action, escalated := confidenceGate(p, action, confidence, findings, probabilities, surface)
+	action, escalated := confidenceGate(p, action, confidence, findings, probabilities, surface, choice, signals, corroboration.MinChoice)
 	if escalated {
 		applied = append(applied, "confidence-gate")
 	}
@@ -390,9 +399,32 @@ func overallConfidence(answers Answers, findings []Finding, confidences map[stri
 }
 
 // confidenceGate escalates toward review, because a low-confidence answer is not evidence of safety.
-func confidenceGate(p *Policy, action Action, confidence float64, findings []Finding, probabilities map[string]float64, surface Surface) (Action, bool) {
+func confidenceGate(p *Policy, action Action, confidence float64, findings []Finding, probabilities map[string]float64, surface Surface,
+	choice map[string]any, signals map[string]any, minChoice float64) (Action, bool) {
 	if confidence >= p.MinConfidence() || p.OnLowConfidence() != "escalate" {
 		return action, false
+	}
+	opts := p.ConfidenceGate()
+	if intent, ok := signals["intent"].(string); ok && opts.SkipWhenIntent[intent] && confidence >= opts.SkipMinConfidence {
+		return action, false
+	}
+	if opts.NeedsCorroboration {
+		// Only what the hazard choice backs counts: a sentinel on its own is already answered at
+		// its own band, and is not a reason to hold on top of that.
+		var backed []Finding
+		for _, f := range findings {
+			if !f.Uncorroborated {
+				backed = append(backed, f)
+			}
+		}
+		findings = backed
+		corroborated := map[string]float64{}
+		for cid, pr := range probabilities {
+			if floatOr(choice[cid], 0) >= minChoice {
+				corroborated[cid] = pr
+			}
+		}
+		probabilities = corroborated
 	}
 	nearMiss := false
 	for cid, probability := range probabilities {

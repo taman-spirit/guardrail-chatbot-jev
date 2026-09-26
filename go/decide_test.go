@@ -225,7 +225,7 @@ func TestAnUncorroboratedSentinelAnswersAtItsOwnBand(t *testing.T) {
 	cases := []struct {
 		sentinel float64
 		want     Action
-	}{{0.04, Flag}, {0.1, Review}, {0.2, Block}}
+	}{{0.04, Flag}, {0.1, Flag}, {0.2, Block}}
 	for _, c := range cases {
 		v := decideOn(p, SurfaceInput, answers(A{"s_cse": noul(c.sentinel)}))
 		if v.Action != c.want || !v.Top().Uncorroborated {
@@ -274,6 +274,52 @@ func TestAWeakUncorroboratedSelfHarmSignalDoesNotReplaceTheAnswer(t *testing.T) 
 	} {
 		if v := decideOn(p, SurfaceInput, a); v.Route != RouteCrisisSupport {
 			t.Fatalf("got %s %s", v.Action, v.Route)
+		}
+	}
+}
+
+func TestAWeakUncorroboratedSentinelIsRecordedNotHeld(t *testing.T) {
+	// "How do I report someone I think is doing that?", measured: s_cse 0.06, choice cse 0.
+	v := decideOn(bundled(t), SurfaceInput, answers(A{"s_cse": noul(0.06), "s_prv": noul(0.09)}))
+	if !v.Deliverable() || v.Action != Flag {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+	// Past the block band it still blocks, backed or not.
+	if v := decideOn(bundled(t), SurfaceInput, answers(A{"s_cse": noul(0.2)})); v.Action != Block {
+		t.Fatalf("got %s", v.Action)
+	}
+}
+
+func TestLowConfidenceAloneDoesNotHoldABenignIntent(t *testing.T) {
+	// "Okay, forget all that. What's a good pasta recipe?", measured: pij 0.3 at confidence 0.63.
+	p := bundled(t)
+	benign := answers(A{"hazard": hazard(P{"pij": 0.3}, 0.63), "s_pij": noul(0.28)})
+	if v := decideOn(p, SurfaceInput, benign); !v.Deliverable() || v.HasRule("confidence-gate") {
+		t.Fatalf("got %s %v", v.Action, v.AppliedRules)
+	}
+	// Any other intent still escalates.
+	shady := answers(A{"hazard": hazard(P{"ncr": 0.2}, 0.5), "intent": choice("seeking_information")})
+	if v := decideOn(p, SurfaceInput, shady); !v.HasRule("confidence-gate") {
+		t.Fatalf("got %s %v", v.Action, v.AppliedRules)
+	}
+}
+
+func TestAConversationGoingNowhereIsNotSentToReview(t *testing.T) {
+	p := bundled(t)
+	calm := answers(A{"hazard": hazard(P{"vcr": 0.3}), "escalation": score(0.2)})
+	if v := decideOn(p, SurfaceConversation, calm); Rank(v.Action) >= Rank(Review) {
+		t.Fatalf("got %s", v.Action)
+	}
+	// An escalating one still is, and self-harm is never capped.
+	if v := decideOn(p, SurfaceConversation, answers(A{"hazard": hazard(P{"vcr": 0.3}), "escalation": score(2.0), "actionability": score(2.0)})); Rank(v.Action) < Rank(Review) {
+		t.Fatalf("got %s", v.Action)
+	}
+	if v := decideOn(p, SurfaceConversation, answers(A{"s_ssh": noul(0.5), "escalation": score(0.1)})); v.Route != RouteCrisisSupport {
+		t.Fatalf("got %s %s", v.Action, v.Route)
+	}
+	for _, c := range p.ForSurface(SurfaceConversation) {
+		if c.ID == "spc" {
+			t.Fatal("specialised advice is judged per reply, not across a conversation")
 		}
 	}
 }
